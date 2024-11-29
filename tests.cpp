@@ -114,6 +114,9 @@ void demo_routes() {
         std::cout << "Serving kind: " << args[0] << " type: " << args[1] << std::endl;
     });
 
+    r.add("GET", "/service/:name", [](UserData *user, auto &args) {
+        std::cout << "Now serving unknown service name: " << args[0] << std::endl;
+    });
     r.add("GET", "/service/:name/query/:querystr", [](UserData *user, auto &args) {
         std::cout << "Serving sevice name: " << args[0] << " query: " << args[1] << std::endl;
     });
@@ -148,7 +151,9 @@ void demo_routes() {
         "/service/mail/logs",
         "/service/upkeep/logs/?time=1732666926",
         "/foo/bar/111/baz",
-        "/foo/bar/222"
+        "/foo/bar/222",
+        "/service/uknown",
+        "/someplace/somewhere/unknown"
     };
 
     for (std::string &test_url : test_urls) {

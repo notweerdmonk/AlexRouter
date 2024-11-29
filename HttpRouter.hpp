@@ -97,10 +97,17 @@ private:
 
     using stack_type = stack<frame_type>;
 
+    enum priority_weight {
+        wildcard_weight = 1,
+        variable_weight = 3,
+        match_weight = 9
+    };
+
     struct Node {
         std::string name;
         std::map<std::string, Node *> children;
         short handler;
+        short priority;
         bool terminal;
 
         Node(const std::string &name_)
@@ -109,6 +116,9 @@ private:
     };
 
     Node *tree = new Node("");
+    std::size_t route_count = 0;
+    std::size_t found_idx = 0;
+    std::vector<const char*> found;
     std::string compiled_tree;
     stack_type s;
 
@@ -124,9 +134,24 @@ private:
         delete parent;
     }
 
+    short segment_weight(const std::string &segment) {
+        switch (segment.front()) {
+            case '*':
+                return wildcard_weight;
+
+            case ':':
+                return variable_weight;
+
+            default:
+                return match_weight;
+        }
+    }
+
     void add(std::vector<std::string> route, short handler) {
         Node *parent = tree;
+        short priority;
         for (std::string node : route) {
+            priority += segment_weight(node);
             if (parent->children.find(node) == parent->children.end()) {
                 parent->children[node] = new Node(node);
             }
@@ -134,15 +159,19 @@ private:
         }
 
         parent->handler = handler;
+        parent->priority = priority;
         parent->terminal = true;
+
+        ++route_count;
     }
 
     enum compiled_node_offset {
         node_length_offset = 0,
         node_name_length_offset = 2,
         handler_offset = 4,
-        terminal_offset = 6,
-        name_offset = 7
+        priority_offset = 6,
+        terminal_offset = 8,
+        name_offset = 9
     };
 
     unsigned short compile_tree(Node *n) {
@@ -157,6 +186,7 @@ private:
         compiledNode.append((char *) &nodeLength, sizeof(nodeLength));
         compiledNode.append((char *) &nodeNameLength, sizeof(nodeNameLength));
         compiledNode.append((char *) &n->handler, sizeof(n->handler));
+        compiledNode.append((char *) &n->priority, sizeof(n->priority));
         compiledNode.append((char *) &n->terminal, sizeof(n->terminal));
         compiledNode.append(n->name.data(), n->name.length());
 
@@ -164,16 +194,29 @@ private:
         return nodeLength;
     }
 
+    static
     inline unsigned short node_length(const char *node) {
         return *(unsigned short *)node;
     }
 
+    static
     inline unsigned short node_name_length(const char *node) {
-        return *(unsigned short *)&node[2];
+        return *(unsigned short *)&node[node_name_length_offset];
     }
 
+    static
+    inline short node_handler(const char *node) {
+        return *(short *)&node[handler_offset];
+    }
+
+    static
+    inline short node_priority(const char *node) {
+        return *(short *)&node[priority_offset];
+    }
+
+    static
     inline bool is_terminal(const char *node) {
-        return *(bool *)&node[6];
+        return *(bool *)&node[terminal_offset];
     }
 
     inline bool match_node(const char *candidate, const char *name,
@@ -279,6 +322,7 @@ private:
         const char *stop, *start = url;
         const char *end_ptr = getNextSegment(url, url + length, '?');
 
+        found_idx = 0;
         s.clear();
 
         /* Push children on to stack */
@@ -311,7 +355,8 @@ private:
             if ( (stop == end_ptr || start == end_ptr) &&
                     is_terminal(treeStart) ) {
 
-                return *(short *) &treeStart[4];
+                found[found_idx++] = treeStart;
+                continue;
             }
             
             /* Push children on to stack */
@@ -332,7 +377,17 @@ private:
         } while (stop != end_ptr);
 #endif
 
-        return -1;
+        return found_idx > 0 ?
+            node_handler(*std::max_element(
+                    found.begin(),
+                    found.begin() + found_idx,
+                    [](const char *&a, const char *&b) -> bool {
+                        return a && b ?
+                            node_priority(a) < node_priority(b) :
+                            false;
+                    }
+                )) :
+            -1;
     }
 
 public:
@@ -380,6 +435,9 @@ public:
     }
 
     void compile() {
+        /* Expand found vector */
+        found.resize(route_count, nullptr);
+
         compiled_tree.clear();
         compile_tree(tree);
     }

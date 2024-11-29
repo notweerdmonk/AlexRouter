@@ -101,9 +101,14 @@ private:
         std::string name;
         std::map<std::string, Node *> children;
         short handler;
+        bool terminal;
+
+        Node(const std::string &name_)
+            : name(name_), handler(-1), terminal(false) {
+        }
     };
 
-    Node *tree = new Node({"", {}, -1});
+    Node *tree = new Node("");
     std::string compiled_tree;
     stack_type s;
 
@@ -123,14 +128,25 @@ private:
         Node *parent = tree;
         for (std::string node : route) {
             if (parent->children.find(node) == parent->children.end()) {
-                parent->children[node] = new Node({node, {}, handler});
+                parent->children[node] = new Node(node);
             }
             parent = parent->children[node];
         }
+
+        parent->handler = handler;
+        parent->terminal = true;
     }
 
+    enum compiled_node_offset {
+        node_length_offset = 0,
+        node_name_length_offset = 2,
+        handler_offset = 4,
+        terminal_offset = 6,
+        name_offset = 7
+    };
+
     unsigned short compile_tree(Node *n) {
-        unsigned short nodeLength = 6 + n->name.length();
+        unsigned short nodeLength = name_offset + n->name.length();
         for (auto c : n->children) {
             nodeLength += compile_tree(c.second);
         }
@@ -141,6 +157,7 @@ private:
         compiledNode.append((char *) &nodeLength, sizeof(nodeLength));
         compiledNode.append((char *) &nodeNameLength, sizeof(nodeNameLength));
         compiledNode.append((char *) &n->handler, sizeof(n->handler));
+        compiledNode.append((char *) &n->terminal, sizeof(n->terminal));
         compiledNode.append(n->name.data(), n->name.length());
 
         compiled_tree = compiledNode + compiled_tree;
@@ -155,6 +172,10 @@ private:
         return *(unsigned short *)&node[2];
     }
 
+    inline bool is_terminal(const char *node) {
+        return *(bool *)&node[6];
+    }
+
     inline bool match_node(const char *candidate, const char *name,
             std::size_t name_length, std::size_t &params_idx) {
 
@@ -163,12 +184,12 @@ private:
 
         // wildcard, parameter, equal
         //if (nodeNameLength == 0) { /* empty node name is valid case */
-        if (candidate[6] == '*') {
+        if (candidate[name_offset] == '*') {
             /* use '*' for wildcards */
 
             return true;
 
-        } else if (candidate[6] == ':') {
+        } else if (candidate[name_offset] == ':') {
             // parameter
 
             if (params_idx < params.size()) {
@@ -190,7 +211,7 @@ private:
             return true;
 
         } else if (nodeNameLength == name_length &&
-                !memcmp(candidate + 6, name, name_length)) {
+                !memcmp(candidate + name_offset, name, name_length)) {
             return true;
         }
 
@@ -243,7 +264,7 @@ private:
     inline void push_children(const char *segment, const char *node,
             std::size_t params_idx) {
 
-        for (const char *child = node + 6 + node_name_length(node);
+        for (const char *child = node + name_offset + node_name_length(node);
                 child < node + node_length(node);
                 child = child + node_length(child)) {
 
@@ -285,9 +306,12 @@ private:
             /* Move to next URL segment */
             start = stop + 1;
 
-            /* Check if we have reached the end of URL string */
-            if (stop == end_ptr || start == end_ptr) {
-                break;
+            /* Check if we have reached the end of URL string and trie node is
+             * terminal */
+            if ( (stop == end_ptr || start == end_ptr) &&
+                    is_terminal(treeStart) ) {
+
+                return *(short *) &treeStart[4];
             }
             
             /* Push children on to stack */
@@ -308,7 +332,7 @@ private:
         } while (stop != end_ptr);
 #endif
 
-        return *(short *) &treeStart[4];
+        return -1;
     }
 
 public:

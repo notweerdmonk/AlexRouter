@@ -122,6 +122,14 @@ void demo_routes() {
         std::cout << "Now serving logs" << std::endl;
     });
 
+    r.add("GET", "/foo/bar/:arg/baz", [](UserData *user, auto &args) {
+        std::cout << "Serving foobar with baz arg: " << args[0] << std::endl;
+    });
+
+    r.add("GET", "/foo/bar/:arg", [](UserData *user, auto &args) {
+        std::cout << "Serving foobar arg: " << args[0] << std::endl;
+    });
+
     // run benchmark of various urls
     std::vector<std::string> test_urls = {
         "/service/candy/lollipop",
@@ -138,7 +146,9 @@ void demo_routes() {
         "/service/cheese/dash/mozarella",
         "/service/cheese/query/name/",
         "/service/mail/logs",
-        "/service/upkeep/logs/?time=1732666926"
+        "/service/upkeep/logs/?time=1732666926",
+        "/foo/bar/111/baz",
+        "/foo/bar/222"
     };
 
     for (std::string &test_url : test_urls) {

@@ -108,8 +108,9 @@ private:
         node_name_length_offset = 2,
         handler_offset = 4,
         priority_offset = 6,
-        terminal_offset = 8,
-        name_offset = 9
+        abs_priority_offset = 8,
+        terminal_offset = 10,
+        name_offset = 11
     };
 
     struct node {
@@ -117,6 +118,7 @@ private:
         std::map<std::string, node *> children;
         short handler;
         short priority;
+        short abs_priority;
         bool terminal;
 
         node(const std::string &name_)
@@ -152,6 +154,11 @@ private:
     }
 
     static
+    inline short node_abs_priority(const char *node) {
+        return *(short *)&node[abs_priority_offset];
+    }
+
+    static
     inline bool is_terminal(const char *node) {
         return *(bool *)&node[terminal_offset];
     }
@@ -183,9 +190,21 @@ private:
 
     void add(std::vector<std::string> route, short handler) {
         node *parent = tree;
-        short priority;
-        for (std::string segment : route) {
-            priority += segment_weight(segment);
+
+        using size_type = std::vector<std::string>::size_type;
+
+        size_type size = route.size();
+        short priority = 0;
+        short abs_priority = 0;
+
+        for (size_type i = 0; i < size; ++i) {
+            std::string &segment = route[i];
+            short weight = segment_weight(segment);
+            size_type shift = size - i - 1;
+
+            priority += weight;
+            abs_priority += shift ? (2 << shift - 1) * weight : weight;
+
             if (parent->children.find(segment) == parent->children.end()) {
                 parent->children[segment] = new node(segment);
             }
@@ -194,6 +213,7 @@ private:
 
         parent->handler = handler;
         parent->priority = priority;
+        parent->abs_priority = abs_priority;
         parent->terminal = true;
 
         ++route_count;
@@ -212,6 +232,7 @@ private:
         compiled_node.append((char *) &node_name_len, sizeof(node_name_len));
         compiled_node.append((char *) &n->handler, sizeof(n->handler));
         compiled_node.append((char *) &n->priority, sizeof(n->priority));
+        compiled_node.append((char *) &n->abs_priority, sizeof(n->abs_priority));
         compiled_node.append((char *) &n->terminal, sizeof(n->terminal));
         compiled_node.append(n->name.data(), n->name.length());
 
@@ -223,7 +244,6 @@ private:
             std::size_t name_length, std::size_t &params_idx) {
 
         // wildcard, parameter, equal
-        //if (node_name_length(candidate) == 0) { /* empty node name is valid case */
         if (candidate[name_offset] == '*') {
             /* use '*' for wildcards */
 
@@ -379,9 +399,16 @@ private:
                     found.begin(),
                     found.begin() + found_idx,
                     [](const char *&a, const char *&b) -> bool {
-                        return a && b ?
-                            node_priority(a) < node_priority(b) :
-                            false;
+                        if (!a || !b) {
+                            return false;
+                        }
+
+                        short a_prio = node_priority(a);
+                        short b_prio = node_priority(b);
+                            
+                        return a_prio == b_prio ?
+                            node_abs_priority(a) < node_abs_priority(b) :
+                                a_prio < b_prio ? true : false;
                     }
                 )) :
             -1;

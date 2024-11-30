@@ -117,6 +117,7 @@ void demo_routes() {
     r.add("GET", "/service/:name", [](user_data *user, auto &args) {
         std::cout << "Now serving unknown service name: " << args[0] << std::endl;
     });
+
     r.add("GET", "/service/:name/query/:querystr", [](user_data *user, auto &args) {
         std::cout << "Serving sevice name: " << args[0] << " query: " << args[1] << std::endl;
     });
@@ -131,6 +132,16 @@ void demo_routes() {
 
     r.add("GET", "/foo/bar/:arg", [](user_data *user, auto &args) {
         std::cout << "Serving foobar arg: " << args[0] << std::endl;
+    });
+
+    /* Should be of lower priority */
+    r.add("GET", "/:name/known", [](user_data *user, auto &args) {
+        std::cout << "Place name: " << args[0] << std::endl;
+    });
+
+    /* Should be of higher priority becuase there is match before variable */
+    r.add("GET", "/someplace/:name", [](user_data *user, auto &args) {
+        std::cout << "Some place service name: " << args[0] << std::endl;
     });
 
     // run benchmark of various urls
@@ -152,8 +163,9 @@ void demo_routes() {
         "/service/upkeep/logs/?time=1732666926",
         "/foo/bar/111/baz",
         "/foo/bar/222",
-        "/service/uknown",
-        "/someplace/somewhere/unknown"
+        "/service/unknown",
+        "/someplace/somewhere/unknown",
+        "/someplace/known"
     };
 
     for (std::string &test_url : test_urls) {
@@ -162,10 +174,14 @@ void demo_routes() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     calculate_cpu_clock_speed();
     std::cout << "\nDemo\n\n";
     demo_routes();
-    std::cout << "\nBenchmark\n\n";
-    benchmark_routes();
+    if (argc > 1) {
+        std::cout << "\nBenchmark\n\n";
+        benchmark_routes();
+    }
+
+    return 0;
 }

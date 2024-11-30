@@ -19,10 +19,10 @@ std::ostream &operator<<(std::ostream &os, string_view &s) {
     return os;
 }
 
-template <class USERDATA>
-class HttpRouter {
+template <typename userdata>
+class http_router {
 private:
-    std::vector<std::function<void(USERDATA, std::vector<string_view> &)>> handlers;
+    std::vector<std::function<void(userdata, std::vector<string_view> &)>> handlers;
     std::vector<string_view> params;
 
     using frame_type = struct {
@@ -112,19 +112,19 @@ private:
         name_offset = 9
     };
 
-    struct Node {
+    struct node {
         std::string name;
-        std::map<std::string, Node *> children;
+        std::map<std::string, node *> children;
         short handler;
         short priority;
         bool terminal;
 
-        Node(const std::string &name_)
+        node(const std::string &name_)
             : name(name_), handler(-1), terminal(false) {
         }
     };
 
-    Node *tree = new Node("");
+    node *tree = new node("");
     std::vector<const char *>::size_type route_count = 0;
     std::vector<const char *>::size_type found_idx = 0;
     std::vector<const char *> found;
@@ -156,7 +156,7 @@ private:
         return *(bool *)&node[terminal_offset];
     }
 
-    void free_children(Node *parent) {
+    void free_children(node *parent) {
         if (!parent) {
             return;
         }
@@ -182,14 +182,14 @@ private:
     }
 
     void add(std::vector<std::string> route, short handler) {
-        Node *parent = tree;
+        node *parent = tree;
         short priority;
-        for (std::string node : route) {
-            priority += segment_weight(node);
-            if (parent->children.find(node) == parent->children.end()) {
-                parent->children[node] = new Node(node);
+        for (std::string segment : route) {
+            priority += segment_weight(segment);
+            if (parent->children.find(segment) == parent->children.end()) {
+                parent->children[segment] = new node(segment);
             }
-            parent = parent->children[node];
+            parent = parent->children[segment];
         }
 
         parent->handler = handler;
@@ -199,34 +199,31 @@ private:
         ++route_count;
     }
 
-    unsigned short compile_tree(Node *n) {
-        unsigned short nodeLength = name_offset + n->name.length();
+    unsigned short compile_tree(node *n) {
+        unsigned short node_len = name_offset + n->name.length();
         for (auto c : n->children) {
-            nodeLength += compile_tree(c.second);
+            node_len += compile_tree(c.second);
         }
 
-        unsigned short nodeNameLength = n->name.length();
+        unsigned short node_name_len = n->name.length();
 
-        std::string compiledNode;
-        compiledNode.append((char *) &nodeLength, sizeof(nodeLength));
-        compiledNode.append((char *) &nodeNameLength, sizeof(nodeNameLength));
-        compiledNode.append((char *) &n->handler, sizeof(n->handler));
-        compiledNode.append((char *) &n->priority, sizeof(n->priority));
-        compiledNode.append((char *) &n->terminal, sizeof(n->terminal));
-        compiledNode.append(n->name.data(), n->name.length());
+        std::string compiled_node;
+        compiled_node.append((char *) &node_len, sizeof(node_len));
+        compiled_node.append((char *) &node_name_len, sizeof(node_name_len));
+        compiled_node.append((char *) &n->handler, sizeof(n->handler));
+        compiled_node.append((char *) &n->priority, sizeof(n->priority));
+        compiled_node.append((char *) &n->terminal, sizeof(n->terminal));
+        compiled_node.append(n->name.data(), n->name.length());
 
-        compiled_tree = compiledNode + compiled_tree;
-        return nodeLength;
+        compiled_tree = compiled_node + compiled_tree;
+        return node_len;
     }
 
     inline bool match_node(const char *candidate, const char *name,
             std::size_t name_length, std::size_t &params_idx) {
 
-        unsigned short nodeLength = node_length(candidate);
-        unsigned short nodeNameLength = node_name_length(candidate);
-
         // wildcard, parameter, equal
-        //if (nodeNameLength == 0) { /* empty node name is valid case */
+        //if (node_name_length(candidate) == 0) { /* empty node name is valid case */
         if (candidate[name_offset] == '*') {
             /* use '*' for wildcards */
 
@@ -253,7 +250,7 @@ private:
 
             return true;
 
-        } else if (nodeNameLength == name_length &&
+        } else if (node_name_length(candidate) == name_length &&
                 !memcmp(candidate + name_offset, name, name_length)) {
             return true;
         }
@@ -298,7 +295,7 @@ private:
 #endif
 
     // returns next slash from start or end
-    inline const char *getNextSegment(const char *start, const char *end,
+    inline const char *next_segment(const char *start, const char *end,
             char delimiter = '/') {
         const char *stop = (const char *) memchr(start, delimiter, end - start);
         return stop ? stop : end;
@@ -318,15 +315,15 @@ private:
     // should take method also!
     inline int lookup(const char *url, int length) {
 
-        const char *treeStart = (char *) compiled_tree.data();
+        const char *compiled_node = (char *) compiled_tree.data();
         const char *stop, *start = url;
-        const char *end_ptr = getNextSegment(url, url + length, '?');
+        const char *end_ptr = next_segment(url, url + length, '?');
 
         found_idx = 0;
         s.clear();
 
         /* Push children on to stack */
-        push_children(start, treeStart, 0);
+        push_children(start, compiled_node, 0);
 
         while (!s.empty()) {
             auto frame = s.pop();
@@ -335,15 +332,15 @@ private:
             start = frame.segptr;
 
             /* Fetch trie node ptr */
-            treeStart = frame.nodeptr;
+            compiled_node = frame.nodeptr;
 
             /* Get the end of current segment */
-            stop = getNextSegment(start, end_ptr);
+            stop = next_segment(start, end_ptr);
 
             //std::cout << "Matching(" << std::string(start, stop - start) << ")"
             //    << std::endl;
 
-            if (!match_node(treeStart, start, stop - start, frame.params_idx)) {
+            if (!match_node(compiled_node, start, stop - start, frame.params_idx)) {
                 continue;
             }
 
@@ -353,23 +350,23 @@ private:
             /* Check if we have reached the end of URL string and trie node is
              * terminal */
             if ( (stop == end_ptr || start == end_ptr) &&
-                    is_terminal(treeStart) ) {
+                    is_terminal(compiled_node) ) {
 
-                found[found_idx++] = treeStart;
+                found[found_idx++] = compiled_node;
                 continue;
             }
             
             /* Push children on to stack */
-            push_children(start, treeStart, frame.params_idx);
+            push_children(start, compiled_node, frame.params_idx);
         }
 
 #if 0
         do {
-            stop = getNextSegment(start, end_ptr);
+            stop = next_segment(start, end_ptr);
 
             //std::cout << "Matching(" << std::string(start, stop - start) << ")" << std::endl;
 
-            if(nullptr == (treeStart = find_node(treeStart, start, stop - start))) {
+            if(nullptr == (compiled_node = find_node(compiled_node, start, stop - start))) {
                 return -1;
             }
 
@@ -391,16 +388,17 @@ private:
     }
 
 public:
-    HttpRouter() {
+    http_router() {
         // maximum 100 parameters
         params.reserve(100);
     }
 
-    ~HttpRouter() {
+    ~http_router() {
         free_children(tree);
     }
         
-    HttpRouter *add(const char *method, const char *pattern, std::function<void(USERDATA, std::vector<string_view> &)> handler) {
+    http_router *add(const char *method, const char *pattern,
+            std::function<void(userdata, std::vector<string_view> &)> handler) {
 
         // step over any initial slash
         if (pattern[0] == '/') {
@@ -412,10 +410,10 @@ public:
 
         const char *stop, *start = pattern;
         const char *end_ptr =
-            getNextSegment(pattern, pattern + strlen(pattern), '?');
+            next_segment(pattern, pattern + strlen(pattern), '?');
 
         do {
-            stop = getNextSegment(start, end_ptr);
+            stop = next_segment(start, end_ptr);
 
             //std::cout << "Segment(" << std::string(start, stop - start) << ")" << std::endl;
 
@@ -443,7 +441,7 @@ public:
     }
 
     void route(const char *method, unsigned int method_length, const char *url,
-            unsigned int url_length, USERDATA userData) {
+            unsigned int url_length, userdata userData) {
 
         /* Prepend method to URL */
         char target[method_length + url_length + 1];

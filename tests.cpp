@@ -33,26 +33,26 @@ void calculate_cpu_clock_speed() {
 }
 
 void benchmark_routes() {
-    struct UserData {
+    struct user_data {
         int routed = 0;
     } userData;
 
-    HttpRouter<UserData *> r;
+    http_router<user_data *> r;
 
     // set up a few routes
-    r.add("GET", "/service/candy/:kind", [](UserData *user, auto &args) {
+    r.add("GET", "/service/candy/:kind", [](user_data *user, auto &args) {
         user->routed++;
     });
 
-    r.add("GET", "/service/shutdown", [](UserData *user, auto &args) {
+    r.add("GET", "/service/shutdown", [](user_data *user, auto &args) {
         user->routed++;
     });
 
-    r.add("GET", "/", [](UserData *user, auto &args) {
+    r.add("GET", "/", [](user_data *user, auto &args) {
         user->routed++;
     });
 
-    r.add("GET", "/:filename", [](UserData *user, auto &args) {
+    r.add("GET", "/:filename", [](user_data *user, auto &args) {
         user->routed++;
     });
 
@@ -83,53 +83,53 @@ void benchmark_routes() {
 }
 
 void demo_routes() {
-    struct UserData {
+    struct user_data {
         // pass whatever you need as user data
     } userData;
 
-    HttpRouter<UserData *> r;
+    http_router<user_data *> r;
 
     // set up a few routes
-    r.add("GET", "/service/candy/:kind", [](UserData *user, auto &args) {
+    r.add("GET", "/service/candy/:kind", [](user_data *user, auto &args) {
         std::cout << "Now serving candy of kind " << args[0] << std::endl;
     });
 
-    r.add("GET", "/service/shutdown", [](UserData *user, auto &args) {
+    r.add("GET", "/service/shutdown", [](user_data *user, auto &args) {
         std::cout << "Shutting down now" << std::endl;
     });
 
-    r.add("GET", "/", [](UserData *user, auto &args) {
+    r.add("GET", "/", [](user_data *user, auto &args) {
         std::cout << "Serving index now" << std::endl;
     });
 
-    r.add("GET", "/:filename", [](UserData *user, auto &args) {
+    r.add("GET", "/:filename", [](user_data *user, auto &args) {
         std::cout << "Serving file: " << args[0] << std::endl;
     });
 
-    r.add("GET", "/:page/:username", [](UserData *user, auto &args) {
+    r.add("GET", "/:page/:username", [](user_data *user, auto &args) {
         std::cout << "Serving page: " << args[0] << " username: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/:kind/dash/:type", [](UserData *user, auto &args) {
+    r.add("GET", "/service/:kind/dash/:type", [](user_data *user, auto &args) {
         std::cout << "Serving kind: " << args[0] << " type: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/:name", [](UserData *user, auto &args) {
+    r.add("GET", "/service/:name", [](user_data *user, auto &args) {
         std::cout << "Now serving unknown service name: " << args[0] << std::endl;
     });
-    r.add("GET", "/service/:name/query/:querystr", [](UserData *user, auto &args) {
+    r.add("GET", "/service/:name/query/:querystr", [](user_data *user, auto &args) {
         std::cout << "Serving sevice name: " << args[0] << " query: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/*/logs", [](UserData *user, auto &args) {
+    r.add("GET", "/service/*/logs", [](user_data *user, auto &args) {
         std::cout << "Now serving logs" << std::endl;
     });
 
-    r.add("GET", "/foo/bar/:arg/baz", [](UserData *user, auto &args) {
+    r.add("GET", "/foo/bar/:arg/baz", [](user_data *user, auto &args) {
         std::cout << "Serving foobar with baz arg: " << args[0] << std::endl;
     });
 
-    r.add("GET", "/foo/bar/:arg", [](UserData *user, auto &args) {
+    r.add("GET", "/foo/bar/:arg", [](user_data *user, auto &args) {
         std::cout << "Serving foobar arg: " << args[0] << std::endl;
     });
 

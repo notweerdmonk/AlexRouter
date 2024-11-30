@@ -103,6 +103,15 @@ private:
         match_weight = 9
     };
 
+    enum compiled_node_offset {
+        node_length_offset = 0,
+        node_name_length_offset = 2,
+        handler_offset = 4,
+        priority_offset = 6,
+        terminal_offset = 8,
+        name_offset = 9
+    };
+
     struct Node {
         std::string name;
         std::map<std::string, Node *> children;
@@ -116,11 +125,36 @@ private:
     };
 
     Node *tree = new Node("");
-    std::size_t route_count = 0;
-    std::size_t found_idx = 0;
-    std::vector<const char*> found;
+    std::vector<const char *>::size_type route_count = 0;
+    std::vector<const char *>::size_type found_idx = 0;
+    std::vector<const char *> found;
     std::string compiled_tree;
     stack_type s;
+
+    static
+    inline unsigned short node_length(const char *node) {
+        return *(unsigned short *)node;
+    }
+
+    static
+    inline unsigned short node_name_length(const char *node) {
+        return *(unsigned short *)&node[node_name_length_offset];
+    }
+
+    static
+    inline short node_handler(const char *node) {
+        return *(short *)&node[handler_offset];
+    }
+
+    static
+    inline short node_priority(const char *node) {
+        return *(short *)&node[priority_offset];
+    }
+
+    static
+    inline bool is_terminal(const char *node) {
+        return *(bool *)&node[terminal_offset];
+    }
 
     void free_children(Node *parent) {
         if (!parent) {
@@ -165,15 +199,6 @@ private:
         ++route_count;
     }
 
-    enum compiled_node_offset {
-        node_length_offset = 0,
-        node_name_length_offset = 2,
-        handler_offset = 4,
-        priority_offset = 6,
-        terminal_offset = 8,
-        name_offset = 9
-    };
-
     unsigned short compile_tree(Node *n) {
         unsigned short nodeLength = name_offset + n->name.length();
         for (auto c : n->children) {
@@ -192,31 +217,6 @@ private:
 
         compiled_tree = compiledNode + compiled_tree;
         return nodeLength;
-    }
-
-    static
-    inline unsigned short node_length(const char *node) {
-        return *(unsigned short *)node;
-    }
-
-    static
-    inline unsigned short node_name_length(const char *node) {
-        return *(unsigned short *)&node[node_name_length_offset];
-    }
-
-    static
-    inline short node_handler(const char *node) {
-        return *(short *)&node[handler_offset];
-    }
-
-    static
-    inline short node_priority(const char *node) {
-        return *(short *)&node[priority_offset];
-    }
-
-    static
-    inline bool is_terminal(const char *node) {
-        return *(bool *)&node[terminal_offset];
     }
 
     inline bool match_node(const char *candidate, const char *name,

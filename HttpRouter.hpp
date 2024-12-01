@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iostream>
 #include <cstdlib>
+#include <climits>
 
 // placeholder
 struct string_view {
@@ -202,7 +203,16 @@ private:
             unsigned short weight = segment_weight(segment);
 
             priority += weight;
+            /* Handle overflow */
+            if (priority == 0 && weight) {
+                priority = USHRT_MAX;
+            }
+
             abs_priority += (1 << (size - i - 1)) * weight;
+            /* Handle overflow */
+            if (abs_priority == 0 && weight) {
+                abs_priority = USHRT_MAX;
+            }
 
             if (parent->children.find(segment) == parent->children.end()) {
                 parent->children[segment] = new node(segment);

@@ -116,8 +116,10 @@ private:
     };
 
     struct node {
-        std::string name;
-        std::map<std::string, node *> children;
+        using map_type = std::unordered_map<std::string, node*>;
+
+        map_type children;
+        const std::string name;
         short handler;
         unsigned short priority;
         unsigned short abs_priority;
@@ -125,6 +127,23 @@ private:
 
         node(const std::string &name_)
             : name(name_), handler(-1), terminal(false) {
+        }
+
+        node(std::string &&name_)
+            : name(name_), handler(-1), terminal(false) {
+        }
+
+        node* add(const string_view &name_) {
+            typename map_type::iterator next;
+
+            /* Named rvalue reference is treated as an lvalue */
+            std::string &&namestr = std::string(name_.data, name_.length);
+
+            if ((next = children.find(namestr)) == children.end()) {
+                return (children[namestr] = new node(namestr));
+            }
+
+            return next->second;
         }
     };
 
@@ -174,8 +193,9 @@ private:
         delete parent;
     }
 
-    unsigned short segment_weight(const std::string &segment) {
-        switch (segment.front()) {
+    /* Assume string_view length > 0 because next_segment split the route */
+    unsigned short segment_weight(const string_view &segment) {
+        switch (segment.data[0]) {
             case '*':
                 return wildcard_weight;
 
@@ -187,17 +207,17 @@ private:
         }
     }
 
-    void add(std::vector<std::string> route, short handler) {
+    void add_nodes(std::vector<string_view> route, short handler) {
         node *parent = tree;
 
-        using size_type = std::vector<std::string>::size_type;
+        using size_type = std::vector<string_view>::size_type;
 
         const size_type size = route.size();
         unsigned int priority = 0;
         unsigned int abs_priority = 0;
 
         for (size_type i = 0; i < size; ++i) {
-            const std::string &segment = route[i];
+            const string_view &segment = route[i];
             const unsigned short weight = segment_weight(segment);
 
             priority += weight;
@@ -212,10 +232,7 @@ private:
                 abs_priority = USHRT_MAX;
             }
 
-            if (parent->children.find(segment) == parent->children.end()) {
-                parent->children[segment] = new node(segment);
-            }
-            parent = parent->children[segment];
+            parent = parent->add(segment);
         }
 
         parent->handler = handler;
@@ -438,39 +455,44 @@ public:
         free_children(tree);
     }
         
-    http_router *add(const char *method, const char *pattern,
-            std::function<void(userdata, std::vector<string_view> &)> handler) {
+    void add(const char *method, const char *pattern,
+            std::function<void(userdata, std::vector<string_view>&)> handler) {
+
+        // if pattern starts with / then move 1+ and run inline slash parser
 
         // step over any initial slash
         if (pattern[0] == '/') {
             pattern++;
         }
 
-        std::vector<std::string> nodes;
-        nodes.push_back(method);
-
         const char *stop, *start = pattern;
         const char *end_ptr =
             next_segment(pattern, pattern + strlen(pattern), '?');
+
+        std::vector<string_view> nodes;
+        nodes.push_back({method, strlen(method)});
 
         do {
             stop = next_segment(start, end_ptr);
 
             //std::cout << "Segment(" << std::string(start, stop - start) << ")" << std::endl;
 
-            nodes.push_back(std::string(start, stop - start));
+            nodes.push_back({start,
+                    static_cast<decltype(string_view::length)>(stop - start)});
 
             start = stop + 1;
         } while (stop != end_ptr && start != end_ptr);
 
-
-        // if pattern starts with / then move 1+ and run inline slash parser
-
-        add(nodes, handlers.size());
+        add_nodes(nodes, handlers.size());
         handlers.push_back(handler);
 
         compile();
-        return this;
+    }
+
+    void add(const std::string &method, const std::string &pattern,
+            std::function<void(userdata, std::vector<string_view>&)> handler) {
+
+        add(method.c_str(), pattern.c_str(), handler);
     }
 
     void compile() {

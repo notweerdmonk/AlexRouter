@@ -90,11 +90,11 @@ void demo_routes() {
     http_router<user_data *> r;
 
     // set up a few routes
-    r.add("GET", "/service/candy/:kind", [](user_data *user, auto &args) {
+    r.add(std::string("GET"), "/service/candy/:kind", [](user_data *user, auto &args) {
         std::cout << "Now serving candy of kind " << args[0] << std::endl;
     });
 
-    r.add("GET", "/service/shutdown", [](user_data *user, auto &args) {
+    r.add(std::string("GET"), "/service/shutdown", [](user_data *user, auto &args) {
         std::cout << "Shutting down now" << std::endl;
     });
 

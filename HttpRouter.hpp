@@ -129,9 +129,6 @@ private:
     };
 
     node *tree = new node("");
-    std::vector<const char *>::size_type route_count = 0;
-    std::vector<const char *>::size_type found_idx = 0;
-    std::vector<const char *> found;
     std::string compiled_tree;
     stack_type s;
 
@@ -225,8 +222,6 @@ private:
         parent->priority = priority;
         parent->abs_priority = abs_priority;
         parent->terminal = true;
-
-        ++route_count;
     }
 
     unsigned short compile_tree(node *n) {
@@ -342,14 +337,36 @@ private:
         } 
     }
 
+    inline void store_match(const char *&store, const char *match) {
+        if (!store) {
+            store = match;
+            return;
+        }
+
+        const unsigned short store_prio = node_priority(store);
+        const unsigned short match_prio = node_priority(match);
+
+        if (store_prio > match_prio) {
+            return;
+        }
+
+        if (store_prio == match_prio &&
+                node_abs_priority(store) >= node_abs_priority(match)) {
+            return;
+        }
+
+        store = match;
+    }
+
     // should take method also!
     inline std::make_signed_t<std::size_t> lookup(const char *url, int length) {
+
+        const char *found = nullptr;
 
         const char *compiled_node = (char *) compiled_tree.data();
         const char *stop, *start = url;
         const char *end_ptr = next_segment(url, url + length, '?');
 
-        found_idx = 0;
         s.clear();
 
         /* Push children on to stack */
@@ -382,7 +399,7 @@ private:
             if ( (stop == end_ptr || start == end_ptr) &&
                     is_terminal(compiled_node) ) {
 
-                found[found_idx++] = compiled_node;
+                store_match(found, compiled_node);
                 continue;
             }
             
@@ -404,24 +421,7 @@ private:
         } while (stop != end_ptr);
 #endif
 
-        return found_idx > 0 ?
-            node_handler(*std::max_element(
-                    found.begin(),
-                    found.begin() + found_idx,
-                    [](const char *&a, const char *&b) -> bool {
-                        if (!a || !b) {
-                            return false;
-                        }
-
-                        const unsigned short a_prio = node_priority(a);
-                        const unsigned short b_prio = node_priority(b);
-                            
-                        return a_prio == b_prio ?
-                            node_abs_priority(a) < node_abs_priority(b) :
-                                a_prio < b_prio ? true : false;
-                    }
-                )) :
-            -1;
+        return found ? node_handler(found) : -1;
     }
 
 public:
@@ -470,9 +470,6 @@ public:
     }
 
     void compile() {
-        /* Expand found vector */
-        found.resize(route_count, nullptr);
-
         compiled_tree.clear();
         compile_tree(tree);
     }

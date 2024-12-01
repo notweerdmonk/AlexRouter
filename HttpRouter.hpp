@@ -117,8 +117,8 @@ private:
         std::string name;
         std::map<std::string, node *> children;
         short handler;
-        short priority;
-        short abs_priority;
+        unsigned short priority;
+        unsigned short abs_priority;
         bool terminal;
 
         node(const std::string &name_)
@@ -149,13 +149,13 @@ private:
     }
 
     static
-    inline short node_priority(const char *node) {
-        return *(short *)&node[priority_offset];
+    inline unsigned short node_priority(const char *node) {
+        return *(unsigned short *)&node[priority_offset];
     }
 
     static
-    inline short node_abs_priority(const char *node) {
-        return *(short *)&node[abs_priority_offset];
+    inline unsigned short node_abs_priority(const char *node) {
+        return *(unsigned short *)&node[abs_priority_offset];
     }
 
     static
@@ -175,7 +175,7 @@ private:
         delete parent;
     }
 
-    short segment_weight(const std::string &segment) {
+    unsigned short segment_weight(const std::string &segment) {
         switch (segment.front()) {
             case '*':
                 return wildcard_weight;
@@ -194,12 +194,12 @@ private:
         using size_type = std::vector<std::string>::size_type;
 
         size_type size = route.size();
-        short priority = 0;
-        short abs_priority = 0;
+        unsigned short priority = 0;
+        unsigned short abs_priority = 0;
 
         for (size_type i = 0; i < size; ++i) {
             std::string &segment = route[i];
-            short weight = segment_weight(segment);
+            unsigned short weight = segment_weight(segment);
 
             priority += weight;
             abs_priority += (1 << (size - i - 1)) * weight;
@@ -402,8 +402,8 @@ private:
                             return false;
                         }
 
-                        short a_prio = node_priority(a);
-                        short b_prio = node_priority(b);
+                        unsigned short a_prio = node_priority(a);
+                        unsigned short b_prio = node_priority(b);
                             
                         return a_prio == b_prio ?
                             node_abs_priority(a) < node_abs_priority(b) :

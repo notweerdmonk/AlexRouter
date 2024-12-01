@@ -195,13 +195,13 @@ private:
 
         using size_type = std::vector<std::string>::size_type;
 
-        size_type size = route.size();
+        const size_type size = route.size();
         unsigned int priority = 0;
         unsigned int abs_priority = 0;
 
         for (size_type i = 0; i < size; ++i) {
-            std::string &segment = route[i];
-            unsigned short weight = segment_weight(segment);
+            const std::string &segment = route[i];
+            const unsigned short weight = segment_weight(segment);
 
             priority += weight;
             /* Handle overflow */
@@ -413,8 +413,8 @@ private:
                             return false;
                         }
 
-                        unsigned short a_prio = node_priority(a);
-                        unsigned short b_prio = node_priority(b);
+                        const unsigned short a_prio = node_priority(a);
+                        const unsigned short b_prio = node_priority(b);
                             
                         return a_prio == b_prio ?
                             node_abs_priority(a) < node_abs_priority(b) :

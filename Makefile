@@ -9,6 +9,8 @@ ifneq ($(DEBUG),)
 CFLAGS += -ggdb3
 endif
 
+CFLAGS += -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
+
 ifeq ($(INCLUDE_DIR),)
 INCLUDE_DIR := .
 endif

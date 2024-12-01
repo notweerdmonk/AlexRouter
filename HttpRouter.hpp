@@ -338,6 +338,10 @@ private:
     }
 
     inline void store_match(const char *&store, const char *match) {
+        if (!match) {
+            return;
+        }
+
         if (!store) {
             store = match;
             return;

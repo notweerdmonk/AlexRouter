@@ -195,8 +195,8 @@ private:
         using size_type = std::vector<std::string>::size_type;
 
         size_type size = route.size();
-        unsigned short priority = 0;
-        unsigned short abs_priority = 0;
+        unsigned int priority = 0;
+        unsigned int abs_priority = 0;
 
         for (size_type i = 0; i < size; ++i) {
             std::string &segment = route[i];
@@ -204,13 +204,13 @@ private:
 
             priority += weight;
             /* Handle overflow */
-            if (priority == 0 && weight) {
+            if (priority > USHRT_MAX) {
                 priority = USHRT_MAX;
             }
 
             abs_priority += (1 << (size - i - 1)) * weight;
             /* Handle overflow */
-            if (abs_priority == 0 && weight) {
+            if (abs_priority > USHRT_MAX) {
                 abs_priority = USHRT_MAX;
             }
 

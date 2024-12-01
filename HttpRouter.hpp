@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <climits>
+#include <type_traits>
 
 // placeholder
 struct string_view {
@@ -342,7 +343,7 @@ private:
     }
 
     // should take method also!
-    inline int lookup(const char *url, int length) {
+    inline std::make_signed_t<std::size_t> lookup(const char *url, int length) {
 
         const char *compiled_node = (char *) compiled_tree.data();
         const char *stop, *start = url;
@@ -479,6 +480,8 @@ public:
     void route(const char *method, unsigned int method_length, const char *url,
             unsigned int url_length, userdata userData) {
 
+        using size_type = decltype(handlers)::size_type;
+
         /* Prepend method to URL */
         char target[method_length + url_length + 1];
         memcpy(target, method, method_length);
@@ -486,7 +489,8 @@ public:
         target[method_length + url_length] = '\0';
 
         auto handler_id = lookup(target, method_length + url_length);
-        if (handler_id > -1 && handler_id < handlers.size()) {
+        if (handler_id > -1 &&
+                static_cast<size_type>(handler_id) < handlers.size()) {
             handlers[handler_id](userData, params);
             params.clear();
         }

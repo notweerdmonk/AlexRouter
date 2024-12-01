@@ -200,10 +200,9 @@ private:
         for (size_type i = 0; i < size; ++i) {
             std::string &segment = route[i];
             short weight = segment_weight(segment);
-            size_type shift = size - i - 1;
 
             priority += weight;
-            abs_priority += shift ? (2 << shift - 1) * weight : weight;
+            abs_priority += (1 << (size - i - 1)) * weight;
 
             if (parent->children.find(segment) == parent->children.end()) {
                 parent->children[segment] = new node(segment);

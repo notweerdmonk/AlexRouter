@@ -136,8 +136,7 @@ private:
         node* add(const string_view &name_) {
             typename map_type::iterator next;
 
-            /* Named rvalue reference is treated as an lvalue */
-            std::string &&namestr = std::string(name_.data, name_.length);
+            std::string namestr(name_.data, name_.length);
 
             if ((next = children.find(namestr)) == children.end()) {
                 return (children[namestr] = new node(namestr));

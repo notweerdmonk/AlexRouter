@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <climits>
 #include <type_traits>
+#include <unordered_map>
 
 // placeholder
 struct string_view {
@@ -119,27 +120,43 @@ private:
         using map_type = std::unordered_map<std::string, node*>;
 
         map_type children;
-        const std::string name;
+        const string_view name;
         short handler;
         unsigned short priority;
         unsigned short abs_priority;
         bool terminal;
 
         node(const std::string &name_)
-            : name(name_), handler(-1), terminal(false) {
+            : name(name_.data(), name_.size()), handler(-1), terminal(false) {
         }
 
         node(std::string &&name_)
+            : name(name_.data(), name_.size()), handler(-1), terminal(false) {
+        }
+
+        node(const string_view &name_)
             : name(name_), handler(-1), terminal(false) {
+        }
+
+        node(string_view &&name_)
+            : name(std::move(name_)), handler(-1), terminal(false) {
         }
 
         node* add(const string_view &name_) {
             typename map_type::iterator next;
-
-            std::string namestr(name_.data, name_.length);
+            const std::string namestr(name_.data, name_.length);
 
             if ((next = children.find(namestr)) == children.end()) {
-                return (children[namestr] = new node(namestr));
+                /*
+                 * Create an entry in the map and get it.
+                 * Insertion will succeed because we found no entries earlier,
+                 * can skip checking second element of std::pair.
+                 */
+                next = children.emplace(std::make_pair(std::move(namestr),
+                            nullptr)).first;
+
+                next->second = new node(string_view(next->first.data(),
+                            next->first.size()));
             }
 
             return next->second;
@@ -241,12 +258,12 @@ private:
     }
 
     unsigned short compile_tree(node *n) {
-        unsigned short node_len = name_offset + n->name.length();
+        unsigned short node_len = name_offset + n->name.length;
         for (auto c : n->children) {
             node_len += compile_tree(c.second);
         }
 
-        unsigned short node_name_len = n->name.length();
+        unsigned short node_name_len = n->name.length;
 
         std::string compiled_node;
         compiled_node.append((char *) &node_len, sizeof(node_len));
@@ -255,7 +272,7 @@ private:
         compiled_node.append((char *) &n->priority, sizeof(n->priority));
         compiled_node.append((char *) &n->abs_priority, sizeof(n->abs_priority));
         compiled_node.append((char *) &n->terminal, sizeof(n->terminal));
-        compiled_node.append(n->name.data(), n->name.length());
+        compiled_node.append(n->name.data, n->name.length);
 
         compiled_tree = compiled_node + compiled_tree;
         return node_len;

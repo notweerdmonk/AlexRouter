@@ -9,7 +9,11 @@ ifneq ($(DEBUG),)
 CFLAGS += -ggdb3
 endif
 
-CFLAGS += -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
+ifeq ($(OPTIM),)
+OPTIM := -O3
+endif
+
+CFLAGS += $(OPTIM) -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
 
 ifeq ($(INCLUDE_DIR),)
 INCLUDE_DIR := .

@@ -40,19 +40,23 @@ void benchmark_routes() {
     http_router<user_data *> r;
 
     // set up a few routes
-    r.add("GET", "/service/candy/:kind", [](user_data *user, auto &args) {
+    r.add("GET", "/service/candy/:kind", [](user_data *user,
+                std::vector<string_view> &args) {
         user->routed++;
     });
 
-    r.add("GET", "/service/shutdown", [](user_data *user, auto &args) {
+    r.add("GET", "/service/shutdown", [](user_data *user,
+                std::vector<string_view> &args) {
         user->routed++;
     });
 
-    r.add("GET", "/", [](user_data *user, auto &args) {
+    r.add("GET", "/", [](user_data *user,
+                std::vector<string_view> &args) {
         user->routed++;
     });
 
-    r.add("GET", "/:filename", [](user_data *user, auto &args) {
+    r.add("GET", "/:filename", [](user_data *user,
+                std::vector<string_view> &args) {
         user->routed++;
     });
 
@@ -90,57 +94,70 @@ void demo_routes() {
     http_router<user_data *> r;
 
     // set up a few routes
-    r.add(std::string("GET"), "/service/candy/:kind", [](user_data *user, auto &args) {
+    r.add(std::string("GET"), "/service/candy/:kind", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Now serving candy of kind " << args[0] << std::endl;
     });
 
-    r.add(std::string("GET"), "/service/shutdown", [](user_data *user, auto &args) {
+    r.add(std::string("GET"), "/service/shutdown", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Shutting down now" << std::endl;
     });
 
-    r.add("GET", "/", [](user_data *user, auto &args) {
+    r.add("GET", "/", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving index now" << std::endl;
     });
 
-    r.add("GET", "/:filename", [](user_data *user, auto &args) {
+    r.add("GET", "/:filename", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving file: " << args[0] << std::endl;
     });
 
-    r.add("GET", "/:page/:username", [](user_data *user, auto &args) {
+    r.add("GET", "/:page/:username", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving page: " << args[0] << " username: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/:kind/dash/:type", [](user_data *user, auto &args) {
+    r.add("GET", "/service/:kind/dash/:type", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving kind: " << args[0] << " type: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/:name", [](user_data *user, auto &args) {
+    r.add("GET", "/service/:name", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Now serving unknown service name: " << args[0] << std::endl;
     });
 
-    r.add("GET", "/service/:name/query/:querystr", [](user_data *user, auto &args) {
+    r.add("GET", "/service/:name/query/:querystr", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving sevice name: " << args[0] << " query: " << args[1] << std::endl;
     });
 
-    r.add("GET", "/service/*/logs", [](user_data *user, auto &args) {
+    r.add("GET", "/service/*/logs", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Now serving logs" << std::endl;
     });
 
-    r.add("GET", "/foo/bar/:arg/baz", [](user_data *user, auto &args) {
+    r.add("GET", "/foo/bar/:arg/baz", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving foobar with baz arg: " << args[0] << std::endl;
     });
 
-    r.add("GET", "/foo/bar/:arg", [](user_data *user, auto &args) {
+    r.add("GET", "/foo/bar/:arg", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Serving foobar arg: " << args[0] << std::endl;
     });
 
     /* Should be of lower priority */
-    r.add("GET", "/:name/known", [](user_data *user, auto &args) {
+    r.add("GET", "/:name/known", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Place name: " << args[0] << std::endl;
     });
 
     /* Should be of higher priority becuase there is match before variable */
-    r.add("GET", "/someplace/:name", [](user_data *user, auto &args) {
+    r.add("GET", "/someplace/:name", [](user_data *user,
+                std::vector<string_view> &args) {
         std::cout << "Some place service name: " << args[0] << std::endl;
     });
 

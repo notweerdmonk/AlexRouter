@@ -15,6 +15,10 @@
 struct string_view {
     const char *data;
     std::size_t length;
+
+    string_view(const char *data_, std::size_t length_)
+        : data(data_), length(length_) {
+    }
 };
 
 std::ostream &operator<<(std::ostream &os, string_view &s) {
@@ -396,7 +400,7 @@ private:
     }
 
     // should take method also!
-    inline std::make_signed_t<std::size_t> lookup(const char *url, int length) {
+    inline std::make_signed<std::size_t>::type lookup(const char *url, int length) {
 
         const char *found = nullptr;
 
@@ -519,7 +523,7 @@ public:
     void route(const char *method, unsigned int method_length, const char *url,
             unsigned int url_length, userdata userData) {
 
-        using size_type = decltype(handlers)::size_type;
+        using size_type = typename decltype(handlers)::size_type;
 
         /* Prepend method to URL */
         char target[method_length + url_length + 1];

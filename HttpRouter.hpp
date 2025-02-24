@@ -18,7 +18,7 @@ struct string_view {
 
     string_view(const char *data_, std::size_t length_)
         : data(data_), length(length_) {
-    }
+        }
 };
 
 std::ostream &operator<<(std::ostream &os, string_view &s) {
@@ -172,33 +172,39 @@ private:
     stack_type s;
 
     static
+    constexpr
     inline unsigned short node_length(const char *node) {
-        return *(unsigned short *)node;
+        return *(reinterpret_cast<const unsigned short *>(node));
     }
 
     static
+    constexpr
     inline unsigned short node_name_length(const char *node) {
-        return *(unsigned short *)&node[node_name_length_offset];
+        return *(reinterpret_cast<const unsigned short *>(&node[node_name_length_offset]));
     }
 
     static
+    constexpr
     inline short node_handler(const char *node) {
-        return *(short *)&node[handler_offset];
+        return *(reinterpret_cast<const short *>(&node[handler_offset]));
     }
 
     static
+    constexpr
     inline unsigned short node_priority(const char *node) {
-        return *(unsigned short *)&node[priority_offset];
+        return *(reinterpret_cast<const unsigned short *>(&node[priority_offset]));
     }
 
     static
+    constexpr
     inline unsigned short node_abs_priority(const char *node) {
-        return *(unsigned short *)&node[abs_priority_offset];
+        return *(reinterpret_cast<const unsigned short *>(&node[abs_priority_offset]));
     }
 
     static
+    constexpr
     inline bool is_terminal(const char *node) {
-        return *(bool *)&node[terminal_offset];
+        return *(reinterpret_cast<const bool *>(&node[terminal_offset]));
     }
 
     void free_children(node *parent) {

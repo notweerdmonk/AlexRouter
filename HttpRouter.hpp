@@ -10,6 +10,7 @@
 #include <climits>
 #include <type_traits>
 #include <unordered_map>
+#include <hermes.hpp>
 
 #if defined(__GNUC__)
 #define __inline [[gnu::always_inline]]
@@ -20,6 +21,16 @@
 #else
 #define __inline inline
 #endif
+
+#if __cplusplus < 201703L
+
+#define IF_CONSTEXPR if
+
+#else /* __cplusplus < 201703L */
+
+#define IF_CONSTEXPR if constexpr
+
+#endif /* __cplusplus < 201703L */
 
 #if __cplusplus < 201703L
 
@@ -54,6 +65,17 @@ struct string_view {
     __inline
     size_type size() const {
         return length_;
+    }
+
+    constexpr
+    void remove_prefix(size_type n) {
+        data_ += n;
+        length_ -= n;
+    }
+
+    constexpr
+    void remove_suffix(size_type n) {
+        length_ -= n;
     }
 
     char operator[](size_type i) const {
@@ -222,10 +244,12 @@ struct string_view {
 
 struct string_view_hash {
   std::size_t operator()(const string_view& sv) const {
-      std::size_t h1 = std::hash<const char*>{}(sv.data());  // Hash the string
-      std::size_t h2 = std::hash<std::size_t>{}(sv.length());  // Hash the size
+      /* Hash the string */
+      std::size_t h1 = std::hash<const char*>{}(sv.data());
+      /* Hash the size */
+      std::size_t h2 = std::hash<std::size_t>{}(sv.length());
 
-      // Combine the two hashes: XOR and multiply by a prime number
+      /* Combine the two hashes: XOR and multiply by a prime number */
       return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
   }
 };
@@ -251,14 +275,21 @@ using std::string_view;
 
 template <typename userdata>
 class http_router {
+
+public:
+    using argstype = std::vector<string_view>;
+    using qargstype = std::unordered_map<std::string, std::string>;
+    using handlertype = std::function<void(userdata, argstype&, qargstype&)>;
+
 private:
-    std::vector<std::function<void(userdata, std::vector<string_view> &)>> handlers;
-    std::vector<string_view> params;
+    std::vector<handlertype> handlers;
+    argstype args;
+    qargstype qargs;
 
     using frame_type = struct {
         const char *segptr;
         const char *nodeptr;
-        std::size_t params_idx;
+        std::size_t args_idx;
     };
 
     template <typename frame>
@@ -413,7 +444,9 @@ private:
     static
     constexpr
     unsigned short node_name_length(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(&node[node_name_length_offset]));
+        return *(reinterpret_cast<const unsigned short *>(
+                    &node[node_name_length_offset])
+                );
     }
 
     __inline
@@ -427,14 +460,18 @@ private:
     static
     constexpr
     unsigned short node_priority(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(&node[priority_offset]));
+        return *(reinterpret_cast<const unsigned short *>(
+                    &node[priority_offset])
+                );
     }
 
     __inline
     static
     constexpr
     unsigned short node_abs_priority(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(&node[abs_priority_offset]));
+        return *(reinterpret_cast<const unsigned short *>(
+                    &node[abs_priority_offset])
+                );
     }
 
     __inline
@@ -513,20 +550,26 @@ private:
         unsigned short node_name_len = n->name.length();
 
         std::string compiled_node;
-        compiled_node.append((char *) &node_len, sizeof(node_len));
-        compiled_node.append((char *) &node_name_len, sizeof(node_name_len));
-        compiled_node.append((char *) &n->handler, sizeof(n->handler));
-        compiled_node.append((char *) &n->priority, sizeof(n->priority));
-        compiled_node.append((char *) &n->abs_priority, sizeof(n->abs_priority));
-        compiled_node.append((char *) &n->terminal, sizeof(n->terminal));
+        compiled_node.append((char*) &node_len, sizeof(node_len));
+        compiled_node.append((char*) &node_name_len, sizeof(node_name_len));
+        compiled_node.append((char*) &n->handler, sizeof(n->handler));
+        compiled_node.append((char*) &n->priority, sizeof(n->priority));
+        compiled_node.append((char*) &n->abs_priority, sizeof(n->abs_priority));
+        compiled_node.append((char*) &n->terminal, sizeof(n->terminal));
         compiled_node.append(n->name.data(), n->name.length());
 
         compiled_tree = compiled_node + compiled_tree;
         return node_len;
     }
 
+    static
+    void query_args(const char* in, std::size_t len, qargstype &qargs) {
+        string_view target(in, len);
+        hermes::query_decode<>(target, qargs);
+    }
+
     inline bool match_node(const char *candidate, const char *name,
-            std::size_t name_length, std::size_t &params_idx) {
+            std::size_t name_length, std::size_t &args_idx) {
 
         // wildcard, parameter, equal
         if (candidate[name_offset] == '*') {
@@ -537,20 +580,20 @@ private:
         } else if (candidate[name_offset] == ':') {
             // parameter
 
-            if (params_idx < params.size()) {
+            if (args_idx < args.size()) {
                 /*
-                 * Update params array at params_idx instead of appending
-                 * We will always backtrack to the params_idx corresponding to
+                 * Update args array at args_idx instead of appending
+                 * We will always backtrack to the args_idx corresponding to
                  * current URL segment
                  */
-                params[params_idx++] = string_view({name, name_length});
+                args[args_idx++] = string_view({name, name_length});
 
             } else {
                 // todo: push this pointer on the stack of args!
-                params.push_back(string_view({name, name_length}));
+                args.push_back(string_view({name, name_length}));
 
-                /* maintain index of params to backtrack */
-                params_idx = params.size();
+                /* maintain index of args to backtrack */
+                args_idx = args.size();
             }
 
             return true;
@@ -563,7 +606,7 @@ private:
         return false;
     }
 
-#if 0
+    /* Deprecated */
     inline const char *find_node(const char *parent_node, const char *name,
         std::size_t name_length) {
 
@@ -585,7 +628,7 @@ private:
                 // parameter
 
                 // todo: push this pointer on the stack of args!
-                params.push_back(string_view({name, name_length}));
+                args.push_back(string_view({name, name_length}));
 
                 return candidate;
             } else if (nodeNameLength == name_length && !memcmp(candidate + 6, name, name_length)) {
@@ -597,7 +640,6 @@ private:
 
         return nullptr;
     }
-#endif
 
     // returns next slash from start or end
     inline const char *next_segment(const char *start, const char *end,
@@ -607,13 +649,13 @@ private:
     }
 
     inline void push_children(const char *segment, const char *node,
-            std::size_t params_idx) {
+            std::size_t args_idx) {
 
         for (const char *child = node + name_offset + node_name_length(node);
                 child < node + node_length(node);
                 child = child + node_length(child)) {
 
-            s.push({segment, child, params_idx});
+            s.push({segment, child, args_idx});
         } 
     }
 
@@ -651,6 +693,12 @@ private:
         const char *stop, *start = url;
         const char *end_ptr = next_segment(url, url + length, '?');
 
+        std::size_t remaining = length - (end_ptr - start);
+
+        if (remaining > 0) {
+            query_args(end_ptr + 1, remaining, qargs);
+        }
+
         s.clear();
 
         /* Push children on to stack */
@@ -671,7 +719,7 @@ private:
             //std::cout << "Matching(" << std::string(start, stop - start) << ")"
             //    << std::endl;
 
-            if (!match_node(compiled_node, start, stop - start, frame.params_idx)) {
+            if (!match_node(compiled_node, start, stop - start, frame.args_idx)) {
                 continue;
             }
 
@@ -688,22 +736,23 @@ private:
             }
             
             /* Push children on to stack */
-            push_children(start, compiled_node, frame.params_idx);
+            push_children(start, compiled_node, frame.args_idx);
         }
 
-#if 0
-        do {
-            stop = next_segment(start, end_ptr);
+        /* Deprecated */
+        IF_CONSTEXPR (false) {
+            do {
+                stop = next_segment(start, end_ptr);
 
-            //std::cout << "Matching(" << std::string(start, stop - start) << ")" << std::endl;
+                //std::cout << "Matching(" << std::string(start, stop - start) << ")" << std::endl;
 
-            if(nullptr == (compiled_node = find_node(compiled_node, start, stop - start))) {
-                return -1;
-            }
+                if(nullptr == (compiled_node = find_node(compiled_node, start, stop - start))) {
+                    return -1;
+                }
 
-            start = stop + 1;
-        } while (stop != end_ptr);
-#endif
+                start = stop + 1;
+            } while (stop != end_ptr);
+        }
 
         return found ? node_handler(found) : -1;
     }
@@ -711,15 +760,14 @@ private:
 public:
     http_router() {
         // maximum 100 parameters
-        params.reserve(100);
+        args.reserve(100);
     }
 
     ~http_router() {
         free_children(tree);
     }
         
-    void add(const char *method, const char *pattern,
-            std::function<void(userdata, std::vector<string_view>&)> handler) {
+    void add(const char *method, const char *pattern, handlertype handler) {
 
         // if pattern starts with / then move 1+ and run inline slash parser
 
@@ -740,8 +788,10 @@ public:
 
             //std::cout << "Segment(" << std::string(start, stop - start) << ")" << std::endl;
 
-            nodes.push_back({start,
-                    static_cast<string_view::size_type>(stop - start)});
+            nodes.push_back(
+                    {start,
+                    static_cast<string_view::size_type>(stop - start)}
+            );
 
             start = stop + 1;
         } while (stop != end_ptr && start != end_ptr);
@@ -753,7 +803,7 @@ public:
     }
 
     void add(const std::string &method, const std::string &pattern,
-            std::function<void(userdata, std::vector<string_view>&)> handler) {
+            handlertype handler) {
 
         add(method.c_str(), pattern.c_str(), handler);
     }
@@ -775,10 +825,13 @@ public:
         target[method_length + url_length] = '\0';
 
         auto handler_id = lookup(target, method_length + url_length);
-        if (handler_id > -1 &&
-                static_cast<size_type>(handler_id) < handlers.size()) {
-            handlers[handler_id](userData, params);
-            params.clear();
+        if (
+                handler_id > -1 &&
+                static_cast<size_type>(handler_id) < handlers.size()
+        ) {
+            handlers[handler_id](userData, args, qargs);
+            args.clear();
+            qargs.clear();
         }
     }
 };

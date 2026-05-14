@@ -22,6 +22,13 @@ endif
 HEADER_FILES := HttpRouter.hpp
 HEADER_FILES := $(foreach header, $(HEADER_FILES), $(INCLUDE_DIR)/$(header))
 
+DEP_MODULES := hermes
+DEP_HEADER_FILES += $(foreach header, $(wildcard $(DEP_MODULES)/*.h), $(header))
+DEP_HEADER_FILES += $(foreach header, $(wildcard $(DEP_MODULES)/*.hpp), $(header))
+DEP_HEADER_FILES := $(foreach header, $(DEP_HEADER_FILES), $(header))
+
+INCLUDE_DIR += $(DEP_MODULES)
+
 INCLUDE_FLAGS := $(foreach include_dir, $(INCLUDE_DIR), -I$(include_dir))
 
 LIBS :=
@@ -35,14 +42,14 @@ TARGETS := $(SRCS:.cpp=)
 
 all: $(TARGETS)
 
-$(OBJECTS): $(HEADER_FILES)
+$(OBJECTS): $(HEADER_FILES) $(DEP_HEADER_FILES)
 
 $(TARGETS): $(OBJECTS)
 
 ./%: ./%.o
 	$(CC) $(INCLUDE_FLAGS) -o $@ $< $(LD_FLAGS)
 
-./%.o: ./%.cpp $(HEADER_FILES)
+./%.o: ./%.cpp $(HEADER_FILES) $(DEP_HEADER_FILES)
 	$(CC) -std=$(CXX_VERSION) $(CFLAGS) $(INCLUDE_FLAGS) -o $@ -c $<
 
 clean:

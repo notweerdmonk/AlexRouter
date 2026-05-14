@@ -1,9 +1,11 @@
-#include "HttpRouter.hpp"
-
 #include <iostream>
 #include <chrono>
 
-static inline uint64_t rdtsc() {
+#include <HttpRouter.hpp>
+
+static
+inline
+uint64_t rdtsc() {
     uint32_t lo, hi;
     asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
     return ((uint64_t)hi << 32) | lo;
@@ -39,26 +41,33 @@ void benchmark_routes() {
 
     http_router<user_data *> r;
 
+    using argstype = http_router<user_data*>::argstype;
+    using qargstype = http_router<user_data*>::qargstype;
+
     // set up a few routes
-    r.add("GET", "/service/candy/:kind", [](user_data *user,
-                std::vector<string_view> &args) {
-        user->routed++;
-    });
+    r.add("GET", "/service/candy/:kind",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                user->routed++;
+            }
+        );
 
-    r.add("GET", "/service/shutdown", [](user_data *user,
-                std::vector<string_view> &args) {
-        user->routed++;
-    });
+    r.add("GET", "/service/shutdown",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                user->routed++;
+            }
+        );
 
-    r.add("GET", "/", [](user_data *user,
-                std::vector<string_view> &args) {
-        user->routed++;
-    });
+    r.add("GET", "/",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                user->routed++;
+            }
+        );
 
-    r.add("GET", "/:filename", [](user_data *user,
-                std::vector<string_view> &args) {
-        user->routed++;
-    });
+    r.add("GET", "/:filename",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                user->routed++;
+            }
+        );
 
     // run benchmark of various urls
     std::vector<std::string> test_urls = {
@@ -79,8 +88,12 @@ void benchmark_routes() {
             r.route("GET", 3, test_url.data(), test_url.length(), &userData);
         }
         auto stop = std::chrono::high_resolution_clock::now();
-        unsigned int ms = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-        std::cout << "[" << 10000.0 / ms << " million req/sec] for URL: " << test_url << std::endl;
+        unsigned int ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                    stop - start
+            ).count();
+        std::cout << "[" << 10000.0 / ms << " million req/sec] for URL: "
+            << test_url << std::endl;
     }
 
     std::cout << "Checksum: " << userData.routed << std::endl << std::endl;
@@ -93,73 +106,110 @@ void demo_routes() {
 
     http_router<user_data *> r;
 
+    using argstype = http_router<user_data*>::argstype;
+    using qargstype = http_router<user_data*>::qargstype;
+
     // set up a few routes
-    r.add(std::string("GET"), "/service/candy/:kind", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Now serving candy of kind " << args[0] << std::endl;
-    });
+    r.add(std::string("GET"), "/service/candy/:kind",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Now serving candy of kind " << args[0]
+                    << "\nquery args:" << std::endl;
+                for (auto &qarg : qargs) {
+                    std::cout << qarg.first << ":" << qarg.second << '\n';
+                }
+            }
+        );
 
-    r.add(std::string("GET"), "/service/shutdown", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Shutting down now" << std::endl;
-    });
+    r.add(std::string("GET"), "/service/shutdown",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Shutting down now\nquery args:" << std::endl;
+                for (auto &qarg : qargs) {
+                    std::cout << qarg.first << ":" << qarg.second << '\n';
+                }
+            }
+        );
 
-    r.add("GET", "/", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving index now" << std::endl;
-    });
+    r.add("GET", "/",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving index now" << std::endl;
+            }
+        );
 
-    r.add("GET", "/:filename", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving file: " << args[0] << std::endl;
-    });
+    r.add("GET", "/:filename",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving file: " << args[0] << std::endl;
+            }
+        );
 
-    r.add("GET", "/:page/:username", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving page: " << args[0] << " username: " << args[1] << std::endl;
-    });
+    r.add("GET", "/:page/:username",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving page: " << args[0] << " username: "
+                    << args[1] << std::endl;
+            }
+        );
 
-    r.add("GET", "/service/:kind/dash/:type", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving kind: " << args[0] << " type: " << args[1] << std::endl;
-    });
+    r.add("GET", "/service/:kind/dash/:type",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving kind: " << args[0] << " type: "
+                    << args[1] << "\nquery args:" << std::endl;
+                for (auto &qarg : qargs) {
+                    std::cout << qarg.first << ":" << qarg.second << '\n';
+                }
+            }
+        );
 
-    r.add("GET", "/service/:name", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Now serving unknown service name: " << args[0] << std::endl;
-    });
+    r.add("GET", "/service/:name",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Now serving unknown service name: "
+                << args[0] << std::endl;
+            }
+        );
 
-    r.add("GET", "/service/:name/query/:querystr", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving sevice name: " << args[0] << " query: " << args[1] << std::endl;
-    });
+    r.add("GET", "/service/:name/query/:querystr",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving sevice name: " << args[0]
+                << " query: " << args[1] << std::endl;
+            }
+        );
 
-    r.add("GET", "/service/*/logs", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Now serving logs" << std::endl;
-    });
+    r.add("GET", "/service/*/logs/:querystr",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Now serving logs for " << args[0]
+                << "\nquery args:" << std::endl;
+                for (auto &qarg : qargs) {
+                    std::cout << qarg.first << ":" << qarg.second << '\n';
+                }
+            }
+        );
 
-    r.add("GET", "/foo/bar/:arg/baz", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving foobar with baz arg: " << args[0] << std::endl;
-    });
+    r.add("GET", "/foo/bar/:arg/baz",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving foobar with baz arg: "
+                << args[0] << std::endl;
+            }
+        );
 
-    r.add("GET", "/foo/bar/:arg", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Serving foobar arg: " << args[0] << std::endl;
-    });
+    r.add("GET", "/foo/bar/:arg",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Serving foobar arg: "
+                << args[0] << std::endl;
+            }
+        );
 
     /* Should be of lower priority */
-    r.add("GET", "/:name/known", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Place name: " << args[0] << std::endl;
-    });
+    r.add("GET", "/:name/known",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Place name: " << args[0] << std::endl;
+            }
+        );
 
     /* Should be of higher priority becuase there is match before variable */
-    r.add("GET", "/someplace/:name", [](user_data *user,
-                std::vector<string_view> &args) {
-        std::cout << "Some place service name: " << args[0] << std::endl;
-    });
+    r.add("GET", "/someplace/:name",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                std::cout << "Some place service name: " <<
+                args[0] << std::endl;
+            }
+        );
 
     // run benchmark of various urls
     std::vector<std::string> test_urls = {
@@ -184,7 +234,7 @@ void demo_routes() {
         "/someplace/somewhere/unknown",
         "/someplace/known",
         "/service/candy/lollipop/?foo=bar&page=123",
-        "/service/cheese/dash/mozarella/?=&input%20string=1%202",
+        "/service/cheese/dash/mozarella/?=&input%20string=1%2020",
         "/service/shutdown?a=b",
         "/service/candy/gum?%41%42%43%44",
     };

@@ -11,20 +11,243 @@
 #include <type_traits>
 #include <unordered_map>
 
-// placeholder
-struct string_view {
-    const char *data;
-    std::size_t length;
+#if defined(__GNUC__)
+#define __inline [[gnu::always_inline]]
+#elif defined(__clang__)
+#define __inline [[clang::always_inline]]
+#elif defined(_MSC_VER)
+#define __inline [[msvc::forceinline]]
+#else
+#define __inline inline
+#endif
 
-    string_view(const char *data_, std::size_t length_)
-        : data(data_), length(length_) {
+#if __cplusplus < 201703L
+
+struct string_view {
+
+    using size_type = std::size_t;
+
+    const char *data_;
+    size_type length_;
+
+    string_view() : data_(nullptr), length_(0) {
+    }
+
+    string_view(const char *data, size_type length)
+        : data_(data), length_(length) {
+    }
+
+    string_view(const char *data)
+        : data_(data), length_(std::strlen(data)) {
+    }
+
+    __inline
+    const char* data() const {
+        return data_;
+    }
+
+    __inline
+    size_type length() const {
+        return length_;
+    }
+
+    __inline
+    size_type size() const {
+        return length_;
+    }
+
+    char operator[](size_type i) const {
+        return data_[i];
+    }
+
+    bool operator==(const string_view &other) {
+        return length_ == other.length_ &&
+            std::memcmp(data_, other.data_, length_) == 0;
+    }
+
+    bool operator==(string_view &&other) {
+        return length_ == other.length_ &&
+            std::memcmp(data_, other.data_, length_) == 0;
+    }
+
+    class const_iterator {
+        const char *pdata;
+
+        friend
+        struct string_view;
+
+        friend
+        const_iterator operator+(int n, const const_iterator &it);
+
+        friend
+        const_iterator operator+(int n, string_view::const_iterator &&it);
+
+    public:
+        const_iterator() : pdata(nullptr) {
         }
+
+        const_iterator(const char* pdata_) : pdata(pdata_) {
+        }
+
+        const_iterator(const const_iterator &other) : pdata(other.pdata) {
+        }
+
+        const_iterator(const_iterator &&other) : pdata(other.pdata) {
+        }
+
+        const_iterator& operator=(const const_iterator &other) {
+            pdata = other.pdata;
+            return *this;
+        }
+
+        const_iterator& operator=(const_iterator &&other) {
+            pdata = other.pdata;
+            return *this;
+        }
+
+        char operator*() const {
+            return *pdata;
+        }
+
+        const_iterator operator++() {
+            const_iterator copy = *this;
+            ++pdata;
+            return copy;
+        }
+
+        const_iterator& operator++(int n) {
+            ++pdata;
+            return *this;
+        }
+
+        bool operator==(const const_iterator &other) {
+            return pdata == other.pdata;
+        }
+
+        bool operator!=(const const_iterator &other) {
+            return pdata != other.pdata;
+        }
+
+        bool operator<(const const_iterator &other) {
+            return pdata < other.pdata;
+        }
+
+        bool operator<=(const const_iterator &other) {
+            return pdata <= other.pdata;
+        }
+
+        bool operator>(const const_iterator &other) {
+            return pdata > other.pdata;
+        }
+
+        bool operator>=(const const_iterator &other) {
+            return pdata >= other.pdata;
+        }
+
+        const_iterator operator+(int n) {
+            return const_iterator(pdata + n);
+        }
+
+        const_iterator operator+(unsigned int n) {
+            return const_iterator(pdata + n);
+        }
+
+        const_iterator operator+(std::size_t n) {
+            return const_iterator(pdata + n);
+        }
+
+        size_type operator-(const const_iterator &other) const {
+            return pdata - other.pdata;
+        }
+
+        const_iterator operator-(int n) {
+            return const_iterator(pdata - n);
+        }
+
+        const_iterator operator-(unsigned int n) {
+            return const_iterator(pdata - n);
+        }
+
+        const_iterator operator-(std::size_t n) {
+            return const_iterator(pdata - n);
+        }
+
+        const_iterator operator+=(int n) {
+            pdata += n;
+            return *this;
+        }
+
+        const_iterator operator+=(unsigned int n) {
+            pdata += n;
+            return *this;
+        }
+
+        const_iterator operator+=(std::size_t n) {
+            pdata += n;
+            return *this;
+        }
+
+        const_iterator operator-=(int n) {
+            pdata -= n;
+            return *this;
+        }
+
+        const_iterator operator-=(unsigned int n) {
+            pdata -= n;
+            return *this;
+        }
+
+        const_iterator operator-=(std::size_t n) {
+            pdata -= n;
+            return *this;
+        }
+    };
+
+    string_view(const const_iterator &cbegin, const const_iterator &cend)
+        : data_(cbegin.pdata), length_(cend - cbegin) {
+    }
+
+    string_view(const const_iterator &cbegin, size_type length)
+        : data_(cbegin.pdata), length_(length) {
+    }
+
+    const_iterator cbegin() const {
+        return const_iterator(data_);
+    }
+
+    const_iterator cend() const {
+        return const_iterator(data_ + length_);
+    }
 };
 
-std::ostream &operator<<(std::ostream &os, string_view &s) {
-    os << std::string(s.data, s.length);
-    return os;
+struct string_view_hash {
+  std::size_t operator()(const string_view& sv) const {
+      std::size_t h1 = std::hash<const char*>{}(sv.data());  // Hash the string
+      std::size_t h2 = std::hash<std::size_t>{}(sv.length());  // Hash the size
+
+      // Combine the two hashes: XOR and multiply by a prime number
+      return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+  }
+};
+
+string_view::const_iterator operator+(int n,
+        const string_view::const_iterator &it) {
+    return string_view::const_iterator(it.pdata + n);
 }
+
+string_view::const_iterator operator+(int n, string_view::const_iterator &&it) {
+    return string_view::const_iterator(it.pdata + n);
+}
+
+std::ostream& operator<<(std::ostream &os, const string_view &s) {
+    return os << std::string(s.data(), s.length());
+}
+
+#else /* __cplusplus < 201703L */
+
+using std::string_view;
+
+#endif /* __cplusplus < 201703L */
 
 template <typename userdata>
 class http_router {
@@ -130,6 +353,14 @@ private:
         unsigned short abs_priority;
         bool terminal;
 
+        node(const char *nameptr)
+            : name(nameptr, strlen(nameptr)), handler(-1), terminal(false) {
+        }
+
+        node(const char *nameptr, string_view::size_type namelength)
+            : name(nameptr, namelength), handler(-1), terminal(false) {
+        }
+
         node(const std::string &name_)
             : name(name_.data(), name_.size()), handler(-1), terminal(false) {
         }
@@ -148,7 +379,7 @@ private:
 
         node* add(const string_view &name_) {
             typename map_type::iterator next;
-            const std::string namestr(name_.data, name_.length);
+            const std::string namestr(name_.data(), name_.length());
 
             if ((next = children.find(namestr)) == children.end()) {
                 /*
@@ -171,39 +402,45 @@ private:
     std::string compiled_tree;
     stack_type s;
 
+    __inline
     static
     constexpr
-    inline unsigned short node_length(const char *node) {
+    unsigned short node_length(const char *node) {
         return *(reinterpret_cast<const unsigned short *>(node));
     }
 
+    __inline
     static
     constexpr
-    inline unsigned short node_name_length(const char *node) {
+    unsigned short node_name_length(const char *node) {
         return *(reinterpret_cast<const unsigned short *>(&node[node_name_length_offset]));
     }
 
+    __inline
     static
     constexpr
-    inline short node_handler(const char *node) {
+    short node_handler(const char *node) {
         return *(reinterpret_cast<const short *>(&node[handler_offset]));
     }
 
+    __inline
     static
     constexpr
-    inline unsigned short node_priority(const char *node) {
+    unsigned short node_priority(const char *node) {
         return *(reinterpret_cast<const unsigned short *>(&node[priority_offset]));
     }
 
+    __inline
     static
     constexpr
-    inline unsigned short node_abs_priority(const char *node) {
+    unsigned short node_abs_priority(const char *node) {
         return *(reinterpret_cast<const unsigned short *>(&node[abs_priority_offset]));
     }
 
+    __inline
     static
     constexpr
-    inline bool is_terminal(const char *node) {
+    bool is_terminal(const char *node) {
         return *(reinterpret_cast<const bool *>(&node[terminal_offset]));
     }
 
@@ -221,7 +458,7 @@ private:
 
     /* Assume string_view length > 0 because next_segment split the route */
     unsigned short segment_weight(const string_view &segment) {
-        switch (segment.data[0]) {
+        switch (segment.data()[0]) {
             case '*':
                 return wildcard_weight;
 
@@ -268,12 +505,12 @@ private:
     }
 
     unsigned short compile_tree(node *n) {
-        unsigned short node_len = name_offset + n->name.length;
+        unsigned short node_len = name_offset + n->name.length();
         for (auto c : n->children) {
             node_len += compile_tree(c.second);
         }
 
-        unsigned short node_name_len = n->name.length;
+        unsigned short node_name_len = n->name.length();
 
         std::string compiled_node;
         compiled_node.append((char *) &node_len, sizeof(node_len));
@@ -282,7 +519,7 @@ private:
         compiled_node.append((char *) &n->priority, sizeof(n->priority));
         compiled_node.append((char *) &n->abs_priority, sizeof(n->abs_priority));
         compiled_node.append((char *) &n->terminal, sizeof(n->terminal));
-        compiled_node.append(n->name.data, n->name.length);
+        compiled_node.append(n->name.data(), n->name.length());
 
         compiled_tree = compiled_node + compiled_tree;
         return node_len;
@@ -504,7 +741,7 @@ public:
             //std::cout << "Segment(" << std::string(start, stop - start) << ")" << std::endl;
 
             nodes.push_back({start,
-                    static_cast<decltype(string_view::length)>(stop - start)});
+                    static_cast<string_view::size_type>(stop - start)});
 
             start = stop + 1;
         } while (stop != end_ptr && start != end_ptr);

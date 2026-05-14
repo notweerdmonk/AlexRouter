@@ -1,8 +1,8 @@
 SHELL := /bin/bash
 CC := g++
 
-ifeq ($(CPP_VERSION),)
-CPP_VERSION := c++23
+ifeq ($(CXX_VERSION),)
+CXX_VERSION := c++23
 endif
 
 ifneq ($(DEBUG),)
@@ -43,7 +43,7 @@ $(TARGETS): $(OBJECTS)
 	$(CC) $(INCLUDE_FLAGS) -o $@ $< $(LD_FLAGS)
 
 ./%.o: ./%.cpp $(HEADER_FILES)
-	$(CC) -std=$(CPP_VERSION) $(CFLAGS) $(INCLUDE_FLAGS) -o $@ -c $<
+	$(CC) -std=$(CXX_VERSION) $(CFLAGS) $(INCLUDE_FLAGS) -o $@ -c $<
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) 

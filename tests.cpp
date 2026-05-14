@@ -182,7 +182,11 @@ void demo_routes() {
         "/foo/bar/222",
         "/service/unknown",
         "/someplace/somewhere/unknown",
-        "/someplace/known"
+        "/someplace/known",
+        "/service/candy/lollipop/?foo=bar&page=123",
+        "/service/cheese/dash/mozarella/?=&input%20string=1%202",
+        "/service/shutdown?a=b",
+        "/service/candy/gum?%41%42%43%44",
     };
 
     for (std::string &test_url : test_urls) {
@@ -193,9 +197,10 @@ void demo_routes() {
 
 int main(int argc, char *argv[]) {
     calculate_cpu_clock_speed();
-    std::cout << "\nDemo\n\n";
-    demo_routes();
-    if (argc > 1) {
+    if (argc == 1) {
+        std::cout << "\nDemo\n\n";
+        demo_routes();
+    } else if (argc > 1) {
         std::cout << "\nBenchmark\n\n";
         benchmark_routes();
     }

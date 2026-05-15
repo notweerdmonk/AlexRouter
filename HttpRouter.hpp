@@ -453,7 +453,7 @@ private:
 
     node *tree = new node("");
     std::string compiled_tree;
-    stack_type s;
+    stack_type route_stack;
 
     template<typename T>
     __inline
@@ -757,7 +757,7 @@ private:
                 child < node + node_length(node);
                 child = child + node_length(child)) {
 
-            s.push({segment, child, args_idx});
+            route_stack.push({segment, child, args_idx});
         } 
     }
 
@@ -792,7 +792,7 @@ private:
     // should take method also!
     inline typename std::make_signed<typename node::size_type>::type lookup(
             const char *url,
-            int length
+            typename node::size_type length
     ) {
 
         const char *found = nullptr;
@@ -806,13 +806,13 @@ private:
             query_args(end_ptr + 1, length - (end_ptr - start), qargs);
         }
 
-        s.clear();
+        route_stack.clear();
 
         /* Push children on to stack */
         push_children(start, compiled_node, 0);
 
-        while (!s.empty()) {
-            auto frame = s.pop();
+        while (!route_stack.empty()) {
+            auto frame = route_stack.pop();
 
             /* Fetch URL segment ptr */
             start = frame.segptr;
@@ -962,6 +962,7 @@ public:
         target[method_length + url_length] = '\0';
 
         auto handler_id = lookup(target, method_length + url_length);
+
         if (
                 handler_id > -1 &&
                 static_cast<size_type>(handler_id) < handlers.size()

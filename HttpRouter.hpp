@@ -13,13 +13,21 @@
 #include <hermes.hpp>
 
 #if defined(__GNUC__)
+
 #define __inline [[gnu::always_inline]]
+
 #elif defined(__clang__)
+
 #define __inline [[clang::always_inline]]
+
 #elif defined(_MSC_VER)
+
 #define __inline [[msvc::forceinline]]
+
 #else
+
 #define __inline inline
+
 #endif
 
 #if __cplusplus < 201703L
@@ -643,7 +651,9 @@ private:
         hermes::query_decode<>(target, qargs);
     }
 
-    inline bool match_node(const char *candidate, const char *name,
+    inline bool match_node(
+            const char *candidate,
+            const char *name,
             typename node::size_type name_length,
             typename node::size_type &args_idx) {
 
@@ -683,19 +693,26 @@ private:
     }
 
     /* Deprecated */
-    inline const char *find_node(const char *parent_node, const char *name,
-        std::size_t name_length) {
+    inline const char *find_node(
+            const char *parent_node,
+            const char *name,
+            std::size_t name_length
+    ) {
 
-        unsigned short nodeLength = *(unsigned short *) &parent_node[0];
-        unsigned short nodeNameLength = *(unsigned short *) &parent_node[2];
+        unsigned short nodeLength = *(unsigned short*)&parent_node[0];
+        unsigned short nodeNameLength = *(unsigned short*)&parent_node[2];
 
-        //std::cout << "Finding node: <" << std::string(name, name_length) << ">" << std::endl;
+        //std::cout << "Finding node: <" << std::string(name, name_length)
+        //    << ">" << std::endl;
 
         const char *stoppp = parent_node + nodeLength;
-        for (const char *candidate = parent_node + 6 + nodeNameLength; candidate < stoppp; ) {
+        for (
+                const char *candidate = parent_node + 6 + nodeNameLength;
+                candidate < stoppp;
+        ) {
 
-            unsigned short nodeLength = *(unsigned short *) &candidate[0];
-            unsigned short nodeNameLength = *(unsigned short *) &candidate[2];
+            unsigned short nodeLength = *(unsigned short*)&candidate[0];
+            unsigned short nodeNameLength = *(unsigned short*)&candidate[2];
 
             // whildcard, parameter, equal
             if (nodeNameLength == 0) {
@@ -707,7 +724,10 @@ private:
                 args.push_back(string_view({name, name_length}));
 
                 return candidate;
-            } else if (nodeNameLength == name_length && !memcmp(candidate + 6, name, name_length)) {
+            } else if (
+                    nodeNameLength == name_length &&
+                    !memcmp(candidate + 6, name, name_length)
+            ) {
                 return candidate;
             }
 
@@ -718,14 +738,20 @@ private:
     }
 
     // returns next slash from start or end
-    inline const char *next_segment(const char *start, const char *end,
-            char delimiter = '/') {
-        const char *stop = (const char *) memchr(start, delimiter, end - start);
+    inline const char *next_segment(
+            const char *start,
+            const char *end,
+            char delimiter = '/'
+    ) {
+        const char *stop = (const char*) memchr(start, delimiter, end - start);
         return stop ? stop : end;
     }
 
-    inline void push_children(const char *segment, const char *node,
-            typename node::size_type args_idx) {
+    inline void push_children(
+            const char *segment,
+            const char *node,
+            typename node::size_type args_idx
+    ) {
 
         for (const char *child = node + name_offset + node_name_length(node);
                 child < node + node_length(node);
@@ -735,7 +761,10 @@ private:
         } 
     }
 
-    inline void store_match(const char *&store, const char *match) {
+    inline void store_match(
+            const char *&store,
+            const char *match
+    ) {
         if (!match) {
             return;
         }
@@ -794,10 +823,17 @@ private:
             /* Get the end of current segment */
             stop = next_segment(start, end_ptr);
 
-            //std::cout << "Matching(" << std::string(start, stop - start) << ")"
-            //    << std::endl;
+            //std::cout << "Matching(" << std::string(start, stop - start)
+            //      << ")" << std::endl;
 
-            if (!match_node(compiled_node, start, stop - start, frame.args_idx)) {
+            if (
+                    !match_node(
+                        compiled_node,
+                        start,
+                        stop - start,
+                        frame.args_idx
+                    )
+            ) {
                 continue;
             }
 
@@ -806,8 +842,10 @@ private:
 
             /* Check if we have reached the end of URL string and trie node is
              * terminal */
-            if ( (stop == end_ptr || start == end_ptr) &&
-                    is_terminal(compiled_node) ) {
+            if (
+                    (stop == end_ptr || start == end_ptr) &&
+                    is_terminal(compiled_node)
+            ) {
 
                 store_match(found, compiled_node);
                 continue;
@@ -822,9 +860,15 @@ private:
             do {
                 stop = next_segment(start, end_ptr);
 
-                //std::cout << "Matching(" << std::string(start, stop - start) << ")" << std::endl;
+                //std::cout << "Matching(" << std::string(start, stop - start)
+                //    << ")" << std::endl;
 
-                if(nullptr == (compiled_node = find_node(compiled_node, start, stop - start))) {
+                if(
+                        nullptr == (
+                            compiled_node =
+                            find_node(compiled_node, start, stop - start)
+                        )
+                ) {
                     return -1;
                 }
 
@@ -845,7 +889,11 @@ public:
         free_children(tree);
     }
         
-    void add(const char *method, const char *pattern, handlertype handler) {
+    void add(
+            const char *method,
+            const char *pattern,
+            handlertype handler
+    ) {
 
         // if pattern starts with / then move 1+ and run inline slash parser
 
@@ -864,11 +912,14 @@ public:
         do {
             stop = next_segment(start, end_ptr);
 
-            //std::cout << "Segment(" << std::string(start, stop - start) << ")" << std::endl;
+            //std::cout << "Segment(" << std::string(start, stop - start)
+            //    << ")" << std::endl;
 
             nodes.push_back(
-                    {start,
-                    static_cast<string_view::size_type>(stop - start)}
+                    {
+                        start,
+                        static_cast<string_view::size_type>(stop - start)
+                    }
             );
 
             start = stop + 1;
@@ -880,8 +931,11 @@ public:
         compile();
     }
 
-    void add(const std::string &method, const std::string &pattern,
-            handlertype handler) {
+    void add(
+            const std::string &method,
+            const std::string &pattern,
+            handlertype handler
+    ) {
 
         add(method.c_str(), pattern.c_str(), handler);
     }
@@ -891,8 +945,13 @@ public:
         compile_tree(tree);
     }
 
-    void route(const char *method, unsigned int method_length, const char *url,
-            unsigned int url_length, userdata userData) {
+    void route(
+            const char *method,
+            unsigned int method_length,
+            const char *url,
+            unsigned int url_length,
+            userdata userData
+    ) {
 
         using size_type = typename decltype(handlers)::size_type;
 

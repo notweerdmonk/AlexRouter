@@ -364,7 +364,7 @@ private:
 
     struct node {
         using map_type = std::unordered_map<std::string, node*>;
-        using size_type = unsigned short;
+        using size_type = std::size_t;
 
         map_type children;
         const string_view name;
@@ -451,7 +451,10 @@ private:
     __inline
     static
     constexpr
-    T read_node_data(const void *node, std::size_t bytes_offset = 0) {
+    T read_node_data(
+            const void *node,
+            typename node::size_type bytes_offset = 0
+    ) {
 #if __cplusplus >= 201703L
         const std::byte *byteptr = static_cast<const std::byte*>(node);
 #else
@@ -465,14 +468,14 @@ private:
     __inline
     static
     constexpr
-    unsigned short node_length(const void *node) {
+    typename node::size_type node_length(const void *node) {
         return read_node_data<unsigned short>(node);
     }
 
     __inline
     static
     constexpr
-    unsigned short node_name_length(const void *node) {
+    typename node::size_type node_name_length(const void *node) {
         return read_node_data<unsigned short>(node, node_name_length_offset);
     }
 
@@ -564,13 +567,14 @@ private:
         parent->terminal = true;
     }
 
-    unsigned short compile_tree(node *n) {
-        unsigned short node_len = name_offset + n->name.length();
+    typename node::size_type compile_tree(node *n) {
+        typename node::size_type node_len = name_offset + n->name.length();
+
         for (auto c : n->children) {
             node_len += compile_tree(c.second);
         }
 
-        unsigned short node_name_len = n->name.length();
+        typename node::size_type node_name_len = n->name.length();
 
         std::string compiled_node(
             sizeof(node_len) +
@@ -579,7 +583,7 @@ private:
             sizeof(n->priority) +
             sizeof(n->abs_priority) +
             sizeof(n->terminal) +
-            static_cast<std::size_t>(node_name_len),
+            node_name_len,
             '\0'
         );
 
@@ -632,7 +636,7 @@ private:
     static
     void query_args(
             const char* in,
-            std::size_t len,
+            typename node::size_type len,
             qargstype &qargs
     ) {
         string_view target(in, len);
@@ -640,7 +644,8 @@ private:
     }
 
     inline bool match_node(const char *candidate, const char *name,
-            std::size_t name_length, std::size_t &args_idx) {
+            typename node::size_type name_length,
+            typename node::size_type &args_idx) {
 
         // wildcard, parameter, equal
         if (candidate[name_offset] == '*') {
@@ -720,7 +725,7 @@ private:
     }
 
     inline void push_children(const char *segment, const char *node,
-            std::size_t args_idx) {
+            typename node::size_type args_idx) {
 
         for (const char *child = node + name_offset + node_name_length(node);
                 child < node + node_length(node);
@@ -756,7 +761,10 @@ private:
     }
 
     // should take method also!
-    inline std::make_signed<std::size_t>::type lookup(const char *url, int length) {
+    inline typename std::make_signed<typename node::size_type>::type lookup(
+            const char *url,
+            int length
+    ) {
 
         const char *found = nullptr;
 
@@ -764,7 +772,7 @@ private:
         const char *stop, *start = url;
         const char *end_ptr = next_segment(url, url + length, '?');
 
-        std::size_t remaining = length - (end_ptr - start);
+        typename node::size_type remaining = length - (end_ptr - start);
 
         if (remaining > 0) {
             query_args(end_ptr + 1, remaining, qargs);

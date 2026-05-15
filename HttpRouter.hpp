@@ -67,13 +67,17 @@ struct string_view {
         return length_;
     }
 
+#if __cplusplus > 201103L
     constexpr
+#endif
     void remove_prefix(size_type n) {
         data_ += n;
         length_ -= n;
     }
 
+#if __cplusplus > 201103L
     constexpr
+#endif
     void remove_suffix(size_type n) {
         length_ -= n;
     }
@@ -358,24 +362,9 @@ private:
 
     using stack_type = stack<frame_type>;
 
-    enum priority_weight {
-        wildcard_weight = 1,
-        variable_weight = 3,
-        match_weight = 9
-    };
-
-    enum compiled_node_offset {
-        node_length_offset = 0,
-        node_name_length_offset = 2,
-        handler_offset = 4,
-        priority_offset = 6,
-        abs_priority_offset = 8,
-        terminal_offset = 10,
-        name_offset = 11
-    };
-
     struct node {
         using map_type = std::unordered_map<std::string, node*>;
+        using size_type = unsigned short;
 
         map_type children;
         const string_view name;
@@ -429,56 +418,90 @@ private:
         }
     };
 
+    enum priority_weight {
+        wildcard_weight = 1,
+        variable_weight = 3,
+        match_weight = 9
+    };
+
+    enum compiled_node_member_sizes {
+        node_length_size        = sizeof(typename node::size_type),
+        node_name_length_size   = sizeof(typename node::size_type),
+        handler_size            = sizeof(node::handler),
+        priority_size           = sizeof(node::priority),
+        abs_priority_size       = sizeof(node::abs_priority),
+        terminal_size           = sizeof(node::terminal)
+    };
+
+    enum compiled_node_offset {
+        node_length_offset      = 0,
+        node_name_length_offset = node_length_offset + node_length_size,
+        handler_offset          = node_name_length_offset + node_name_length_size,
+        priority_offset         = handler_offset + handler_size,
+        abs_priority_offset     = priority_offset + priority_size,
+        terminal_offset         = abs_priority_offset + abs_priority_size,
+        name_offset             = terminal_offset + terminal_size
+    };
+
     node *tree = new node("");
     std::string compiled_tree;
     stack_type s;
 
+    template<typename T>
     __inline
     static
     constexpr
-    unsigned short node_length(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(node));
+    T read_node_data(const void *node, std::size_t bytes_offset = 0) {
+#if __cplusplus >= 201703L
+        const std::byte *byteptr = static_cast<const std::byte*>(node);
+#else
+        const unsigned char *byteptr = static_cast<const unsigned char*>(node);
+#endif
+        T tmpobj;
+        std::memcpy(&tmpobj, byteptr + bytes_offset, sizeof(T));
+        return tmpobj;
     }
 
     __inline
     static
     constexpr
-    unsigned short node_name_length(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(
-                    &node[node_name_length_offset])
-                );
+    unsigned short node_length(const void *node) {
+        return read_node_data<unsigned short>(node);
     }
 
     __inline
     static
     constexpr
-    short node_handler(const char *node) {
-        return *(reinterpret_cast<const short *>(&node[handler_offset]));
+    unsigned short node_name_length(const void *node) {
+        return read_node_data<unsigned short>(node, node_name_length_offset);
     }
 
     __inline
     static
     constexpr
-    unsigned short node_priority(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(
-                    &node[priority_offset])
-                );
+    short node_handler(const void *node) {
+        return read_node_data<short>(node, handler_offset);
     }
 
     __inline
     static
     constexpr
-    unsigned short node_abs_priority(const char *node) {
-        return *(reinterpret_cast<const unsigned short *>(
-                    &node[abs_priority_offset])
-                );
+    unsigned short node_priority(const void *node) {
+        return read_node_data<unsigned short>(node, priority_offset);
     }
 
     __inline
     static
     constexpr
-    bool is_terminal(const char *node) {
-        return *(reinterpret_cast<const bool *>(&node[terminal_offset]));
+    unsigned short node_abs_priority(const void *node) {
+        return read_node_data<unsigned short>(node, abs_priority_offset);
+    }
+
+    __inline
+    static
+    constexpr
+    bool is_terminal(const void *node) {
+        return read_node_data<bool>(node, terminal_offset);
     }
 
     void free_children(node *parent) {
@@ -549,21 +572,69 @@ private:
 
         unsigned short node_name_len = n->name.length();
 
-        std::string compiled_node;
-        compiled_node.append((char*) &node_len, sizeof(node_len));
-        compiled_node.append((char*) &node_name_len, sizeof(node_name_len));
-        compiled_node.append((char*) &n->handler, sizeof(n->handler));
-        compiled_node.append((char*) &n->priority, sizeof(n->priority));
-        compiled_node.append((char*) &n->abs_priority, sizeof(n->abs_priority));
-        compiled_node.append((char*) &n->terminal, sizeof(n->terminal));
-        compiled_node.append(n->name.data(), n->name.length());
+        std::string compiled_node(
+            sizeof(node_len) +
+            sizeof(node_name_len) +
+            sizeof(n->handler) +
+            sizeof(n->priority) +
+            sizeof(n->abs_priority) +
+            sizeof(n->terminal) +
+            static_cast<std::size_t>(node_name_len),
+            '\0'
+        );
+
+        char* ptr = &compiled_node[0];
+
+#ifdef __GNUC__
+
+        ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &node_len, sizeof(node_len))
+        );
+        ptr = reinterpret_cast<decltype(ptr)>(
+            mempcpy(ptr, &node_name_len, sizeof(node_name_len))
+		    );
+        ptr = reinterpret_cast<decltype(ptr)>(
+            mempcpy(ptr, &n->handler, sizeof(n->handler))
+		    );
+        ptr = reinterpret_cast<decltype(ptr)>(
+            mempcpy(ptr, &n->priority, sizeof(n->priority))
+		    );
+        ptr = reinterpret_cast<decltype(ptr)>(
+            mempcpy(ptr, &n->abs_priority, sizeof(n->abs_priority))
+		    );
+        ptr = reinterpret_cast<decltype(ptr)>(
+            mempcpy(ptr, &n->terminal, sizeof(n->terminal))
+		    );
+        memcpy(ptr, n->name.data(), node_name_len);
+
+#else
+
+        memcpy(ptr, &node_len, sizeof(node_len));
+        ptr += sizeof(node_len);
+        memcpy(ptr, &node_name_len, sizeof(node_name_len));
+        ptr += sizeof(node_name_len);
+        memcpy(ptr, &n->handler, sizeof(n->handler));
+        ptr += sizeof(n->handler);
+        memcpy(ptr, &n->priority, sizeof(n->priority));
+        ptr += sizeof(n->priority);
+        memcpy(ptr, &n->abs_priority, sizeof(n->abs_priority));
+        ptr += sizeof(n->abs_priority);
+        memcpy(ptr, &n->terminal, sizeof(n->terminal));
+        ptr += sizeof(n->terminal);
+        memcpy(ptr, n->name.data(), node_name_len);
+
+#endif
 
         compiled_tree = compiled_node + compiled_tree;
         return node_len;
     }
 
     static
-    void query_args(const char* in, std::size_t len, qargstype &qargs) {
+    void query_args(
+            const char* in,
+            std::size_t len,
+            qargstype &qargs
+    ) {
         string_view target(in, len);
         hermes::query_decode<>(target, qargs);
     }

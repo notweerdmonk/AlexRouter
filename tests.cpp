@@ -112,8 +112,11 @@ void demo_routes() {
     // set up a few routes
     r.add(std::string("GET"), "/service/candy/:kind",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Now serving candy of kind " << args[0]
-                    << "\nquery args:" << std::endl;
+                std::cout << "Serving candy of kind " << args[0]
+                    << std::endl;
+                if (qargs.size()) {
+                    std::cout << "query args:\n";
+                }
                 for (auto &qarg : qargs) {
                     std::cout << qarg.first << ":" << qarg.second << '\n';
                 }
@@ -122,7 +125,10 @@ void demo_routes() {
 
     r.add(std::string("GET"), "/service/shutdown",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Shutting down now\nquery args:" << std::endl;
+                std::cout << "Shutting down now" << std::endl;
+                if (qargs.size()) {
+                    std::cout << "query args:\n";
+                }
                 for (auto &qarg : qargs) {
                     std::cout << qarg.first << ":" << qarg.second << '\n';
                 }
@@ -137,21 +143,24 @@ void demo_routes() {
 
     r.add("GET", "/:filename",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving file: " << args[0] << std::endl;
+                std::cout << "Serving file " << args[0] << std::endl;
             }
         );
 
     r.add("GET", "/:page/:username",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving page: " << args[0] << " username: "
+                std::cout << "Serving page " << args[0] << " for username "
                     << args[1] << std::endl;
             }
         );
 
     r.add("GET", "/service/:kind/dash/:type",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving kind: " << args[0] << " type: "
-                    << args[1] << "\nquery args:" << std::endl;
+                std::cout << "Serving service of kind " << args[0] << " and type "
+                    << args[1] << std::endl;
+                if (qargs.size()) {
+                    std::cout << "query args:\n";
+                }
                 for (auto &qarg : qargs) {
                     std::cout << qarg.first << ":" << qarg.second << '\n';
                 }
@@ -160,22 +169,25 @@ void demo_routes() {
 
     r.add("GET", "/service/:name",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Now serving unknown service name: "
+                std::cout << "Serving service "
                 << args[0] << std::endl;
             }
         );
 
     r.add("GET", "/service/:name/query/:querystr",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving sevice name: " << args[0]
+                std::cout << "Serving sevice " << args[0]
                 << " query: " << args[1] << std::endl;
             }
         );
 
     r.add("GET", "/service/*/logs/:querystr",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Now serving logs for " << args[0]
-                << "\nquery args:" << std::endl;
+                std::cout << "Serving logs for " << args[0]
+                << std::endl;
+                if (qargs.size()) {
+                    std::cout << "query args:\n";
+                }
                 for (auto &qarg : qargs) {
                     std::cout << qarg.first << ":" << qarg.second << '\n';
                 }
@@ -184,14 +196,14 @@ void demo_routes() {
 
     r.add("GET", "/foo/bar/:arg/baz",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving foobar with baz arg: "
+                std::cout << "Serving foo/bar with baz, arg is "
                 << args[0] << std::endl;
             }
         );
 
     r.add("GET", "/foo/bar/:arg",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Serving foobar arg: "
+                std::cout << "Serving foo/bar, arg is "
                 << args[0] << std::endl;
             }
         );
@@ -199,14 +211,14 @@ void demo_routes() {
     /* Should be of lower priority */
     r.add("GET", "/:name/known",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Place name: " << args[0] << std::endl;
+                std::cout << "Known place name " << args[0] << std::endl;
             }
         );
 
     /* Should be of higher priority becuase there is match before variable */
     r.add("GET", "/someplace/:name",
             [](user_data *user, argstype &args, qargstype &qargs) {
-                std::cout << "Some place service name: " <<
+                std::cout << "Some place name " <<
                 args[0] << std::endl;
             }
         );
@@ -240,16 +252,18 @@ void demo_routes() {
     };
 
     for (std::string &test_url : test_urls) {
-        std::cout << "[" << test_url << "]" << std::endl;
+        std::cout << "URL: [" << test_url << "]" << std::endl;
         r.route("GET", 3, test_url.data(), test_url.length(), &userData);
+        std::cout << std::endl;
     }
 }
 
 int main(int argc, char *argv[]) {
     calculate_cpu_clock_speed();
     if (argc == 1) {
-        std::cout << "\nDemo\n\n";
+        std::cout << "\nDemo commences\n\n";
         demo_routes();
+        std::cout << "Demo concludes\n\n";
     } else if (argc > 1) {
         std::cout << "\nBenchmark\n\n";
         benchmark_routes();

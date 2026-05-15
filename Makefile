@@ -10,10 +10,16 @@ CFLAGS += -ggdb3
 endif
 
 ifeq ($(OPTIM),)
+
+ifneq ($(DEBUG),)
+OPTIM :=
+else
 OPTIM := -O3
 endif
 
-CFLAGS += $(OPTIM) -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
+endif
+
+CFLAGS += $(OPTIM) -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wstrict-aliasing=2
 
 ifeq ($(INCLUDE_DIR),)
 INCLUDE_DIR := .

@@ -768,14 +768,13 @@ private:
 
         const char *found = nullptr;
 
-        const char *compiled_node = (char *) compiled_tree.data();
-        const char *stop, *start = url;
-        const char *end_ptr = next_segment(url, url + length, '?');
+        const char *compiled_node = (char*)compiled_tree.data();
+        const char *start = url;
+        const char *stop = start + length; // This assignment is for reuse only
+        const char *end_ptr = next_segment(start, stop, '?');
 
-        typename node::size_type remaining = length - (end_ptr - start);
-
-        if (remaining > 0) {
-            query_args(end_ptr + 1, remaining, qargs);
+        if (end_ptr != stop) {
+            query_args(end_ptr + 1, length - (end_ptr - start), qargs);
         }
 
         s.clear();

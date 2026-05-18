@@ -295,7 +295,10 @@ public:
 
 private:
     std::vector<handlertype> handlers;
-    argstype args;
+
+    argstype args1, args2;
+    std::reference_wrapper<argstype> route_args = args1;
+    std::reference_wrapper<argstype> args = args2;
     qargstype qargs;
 
     using frame_type = struct {
@@ -655,7 +658,9 @@ private:
             const char *candidate,
             const char *name,
             typename node::size_type name_length,
-            typename node::size_type &args_idx) {
+            argstype &args,
+            typename node::size_type &args_idx
+    ) {
 
         // wildcard, parameter, equal
         if (candidate[name_offset] == '*') {
@@ -721,7 +726,7 @@ private:
                 // parameter
 
                 // todo: push this pointer on the stack of args!
-                args.push_back(string_view({name, name_length}));
+                args.get().push_back(string_view({name, name_length}));
 
                 return candidate;
             } else if (
@@ -761,32 +766,36 @@ private:
         } 
     }
 
-    inline void store_match(
+    inline bool store_match(
             const char *&store,
             const char *match
     ) {
         if (!match) {
-            return;
+            return false;
         }
 
         if (!store) {
             store = match;
-            return;
+            return true;
         }
 
         const unsigned short store_prio = node_priority(store);
         const unsigned short match_prio = node_priority(match);
 
         if (store_prio > match_prio) {
-            return;
+            return false;
         }
 
-        if (store_prio == match_prio &&
-                node_abs_priority(store) >= node_abs_priority(match)) {
-            return;
+        if (
+                store_prio == match_prio &&
+                node_abs_priority(store) >= node_abs_priority(match)
+        ) {
+            return false;
         }
 
         store = match;
+
+        return true;
     }
 
     // should take method also!
@@ -831,6 +840,7 @@ private:
                         compiled_node,
                         start,
                         stop - start,
+                        route_args,
                         frame.args_idx
                     )
             ) {
@@ -847,7 +857,9 @@ private:
                     is_terminal(compiled_node)
             ) {
 
-                store_match(found, compiled_node);
+                if (store_match(found, compiled_node)) {
+                    std::swap<argstype>(args, route_args);
+                }
                 continue;
             }
             
@@ -882,7 +894,8 @@ private:
 public:
     http_router() {
         // maximum 100 parameters
-        args.reserve(100);
+        route_args.get().reserve(100);
+        args.get().reserve(100);
     }
 
     ~http_router() {
@@ -968,7 +981,7 @@ public:
                 static_cast<size_type>(handler_id) < handlers.size()
         ) {
             handlers[handler_id](userData, args, qargs);
-            args.clear();
+            args.get().clear();
             qargs.clear();
         }
     }

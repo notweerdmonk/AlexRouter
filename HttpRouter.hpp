@@ -1087,11 +1087,21 @@ public:
 
         /* Prepend method to URL */
         char target[method_length + url_length + 1];
+#ifdef __GNUC__
+
+        auto ptr = mempcpy(target, method, method_length);
+        ptr = mempcpy(ptr, url, url_length);
+        *static_cast<char*>(ptr) = '\0';
+
+#else
+
         memcpy(target, method, method_length);
         memcpy(target + method_length, url, url_length);
-        target[method_length + url_length] = '\0';
+        target[sizeof(target) - 1] = '\0';
 
-        auto handler_id = lookup(target, method_length + url_length);
+#endif
+
+        auto handler_id = lookup(target, sizeof(target));
 
         if (
                 handler_id > -1 &&

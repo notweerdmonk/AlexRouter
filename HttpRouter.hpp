@@ -294,19 +294,6 @@ public:
     using handlertype = std::function<void(userdata, argstype&, qargstype&)>;
 
 private:
-    std::vector<handlertype> handlers;
-
-    argstype args1, args2;
-    std::reference_wrapper<argstype> route_args = args1;
-    std::reference_wrapper<argstype> args = args2;
-    qargstype qargs;
-
-    using frame_type = struct {
-        const char *segptr;
-        const char *nodeptr;
-        std::size_t args_idx;
-    };
-
     template <typename frame>
     class stack {
         frame *data_;
@@ -350,11 +337,11 @@ private:
             data_[idx_++] = f;
         }
 
+        /*
+         * Calling tis function when the stack is empty shall lead to undefined
+         * behavior.
+         */
         frame& top() const {
-            if (empty()) {
-                return frame();
-            }
-
             return data_[idx_ - 1];
         }
 
@@ -370,8 +357,6 @@ private:
             idx_ = 0;
         }
     };
-
-    using stack_type = stack<frame_type>;
 
     struct node {
         using map_type = std::unordered_map<std::string, node*>;
@@ -454,9 +439,24 @@ private:
         name_offset             = terminal_offset + terminal_size
     };
 
+    using route_frame_type = struct {
+        const char *segptr;
+        const char *nodeptr;
+        std::size_t args_idx;
+    };
+    using route_stack_type = stack<route_frame_type>;
+
     node *tree = new node("");
+
+    std::vector<handlertype> handlers;
+
+    argstype args1, args2;
+    qargstype qargs;
+    std::reference_wrapper<argstype> route_args = args1;
+    std::reference_wrapper<argstype> args = args2;
+
     std::string compiled_tree;
-    stack_type route_stack;
+    route_stack_type route_stack;
 
     template<typename T>
     __inline
@@ -578,70 +578,197 @@ private:
         parent->terminal = true;
     }
 
+    /*
+     * Algorithm: PostorderDepthToLeaf(root)
+     * Input: root — root of an N-ary tree (each node has .children list)
+     * Output: list of pairs (node, depth) where depth = number of edges from node to deepest leaf
+     * 
+     * Definitions:
+     *   Frame = (node, visited, max_child)
+     *     node: tree node
+     *     parent: tree node
+     *     parent_tree_depth: integer (initially 0 to indicate "no subtree")
+     *     tree_depth: integer (initially 0 to indicate "no subtree")
+     *     visited: boolean
+     * 
+     * Procedure PostorderDepthToLeaf(root)
+     * 1.  if root = NULL then
+     * 2.      return empty list
+     * 3.  end if
+     * 4.
+     * 5.  result ← empty list           // will hold pairs (node, depth)
+     * 6.  stack ← empty stack of Frame
+     * 7.  PUSH(stack, (root, NULL, 0, 0, FALSE))
+     * 8.
+     * 9.  while NOT EMPTY(stack) do
+     * 10.     (node, parent, parent_tree_depth, tree_depth, visited) ← POP(stack)
+     * 11.
+     * 12.     if visited = FALSE then
+     * 13.         if tree_depth = 0 then
+     * 14.             depth ← 0          // node is a leaf
+     * 15.         else
+     * 16.             depth ← tree_depth + 1
+     * 17.         end if
+     * 18.
+     * 19.         APPEND(result, (node, depth))
+     * 20.
+     * 21.         if NOT EMPTY(stack) then
+     * 23.             (pnode, pparent, pparent_tree_depth , ptree_depth, pvisited) ← POP(stack)
+     * 24.             if parent = pparent then
+     * 25.                 // sibling: add current depth and depths of previous
+     *                     // siblings to depth of parent
+     * 25.                 pparent_tree_depth ← pparent_tree_depth + parent_tree_depth + depth
+     * 26.             else if parent = pnode then
+     *                     // parent: add current depth and depths of previous
+     *                     // siblings to depth of parent
+     * 27.                 ptree_depth = parent_tree_depth + depth
+     * 28.             end if
+     * 29.             PUSH(stack, (pnode, pparent, pparent_tree_depth , ptree_depth, pvisited))
+     * 30.         end if
+     * 31.     else
+     * 32.         // first visit: schedule node for revisit after children
+     * 33.         PUSH(stack, (node, TRUE, −∞))
+     * 34.         // push children so they are processed before node;
+     * 35.         // push in reverse order to process left-most child first
+     * 36.         for i ← LENGTH(node.children) − 1 downto 0 do
+     * 37.             child ← node.children[i]
+     * 38.             PUSH(stack, (child, FALSE, −∞))
+     * 39.         end for
+     * 40.     end if
+     * 41. end while
+     * 42.
+     * 43. return result
+     * 44. End Procedure
+     *
+     */
     typename node::size_type compile_tree(node *n) {
-        typename node::size_type node_len = name_offset + n->name.length();
+        using node_frame_type = struct {
+            node *nodeptr;
+            node *parent;
+            typename node::size_type parent_tree_len;
+            typename node::size_type tree_len;
+            bool visited;
+        };
+        using node_stack_type = stack<node_frame_type>;
 
-        for (auto c : n->children) {
-            node_len += compile_tree(c.second);
-        }
+        node_stack_type node_stack;
 
-        typename node::size_type node_name_len = n->name.length();
+        typename node::size_type total_node_len = 0;
 
-        std::string compiled_node(
-            sizeof(node_len) +
-            sizeof(node_name_len) +
-            sizeof(n->handler) +
-            sizeof(n->priority) +
-            sizeof(n->abs_priority) +
-            sizeof(n->terminal) +
-            node_name_len,
-            '\0'
-        );
+        node_stack.push({n, nullptr, 0, 0, false});
 
-        char* ptr = &compiled_node[0];
+        while (!node_stack.empty()) {
+            auto &frame = node_stack.top();
+
+            if (!frame.visited) {
+
+                frame.visited = true;
+
+                auto n = frame.nodeptr;
+                for (auto &c : n->children) {
+                    node_stack.push({c.second, n, 0, 0, false});
+                }
+
+                continue;
+            }
+
+            frame = node_stack.pop();
+            auto n = frame.nodeptr;
+
+            typename node::size_type node_name_len = n->name.length();
+            typename node::size_type node_len = name_offset + node_name_len;
+
+            if (frame.tree_len) {
+                node_len += frame.tree_len;
+            }
+
+            std::string compiled_node(
+                sizeof(typename node::size_type) +
+                sizeof(typename node::size_type) +
+                sizeof(n->handler) +
+                sizeof(n->priority) +
+                sizeof(n->abs_priority) +
+                sizeof(n->terminal) +
+                node_name_len,
+                '\0'
+            );
+
+            char* ptr = &compiled_node[0];
 
 #ifdef __GNUC__
 
-        ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &node_len, sizeof(node_len))
-        );
-        ptr = reinterpret_cast<decltype(ptr)>(
-            mempcpy(ptr, &node_name_len, sizeof(node_name_len))
-		    );
-        ptr = reinterpret_cast<decltype(ptr)>(
-            mempcpy(ptr, &n->handler, sizeof(n->handler))
-		    );
-        ptr = reinterpret_cast<decltype(ptr)>(
-            mempcpy(ptr, &n->priority, sizeof(n->priority))
-		    );
-        ptr = reinterpret_cast<decltype(ptr)>(
-            mempcpy(ptr, &n->abs_priority, sizeof(n->abs_priority))
-		    );
-        ptr = reinterpret_cast<decltype(ptr)>(
-            mempcpy(ptr, &n->terminal, sizeof(n->terminal))
-		    );
-        memcpy(ptr, n->name.data(), node_name_len);
+            ptr = reinterpret_cast<decltype(ptr)>(
+                    mempcpy(ptr, &node_len, sizeof(node_len))
+            );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &node_name_len, sizeof(node_name_len))
+            );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &n->handler, sizeof(n->handler))
+            );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &n->priority, sizeof(n->priority))
+            );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &n->abs_priority, sizeof(n->abs_priority))
+            );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(ptr, &n->terminal, sizeof(n->terminal))
+            );
+            memcpy(ptr, n->name.data(), node_name_len);
 
 #else
 
-        memcpy(ptr, &node_len, sizeof(node_len));
-        ptr += sizeof(node_len);
-        memcpy(ptr, &node_name_len, sizeof(node_name_len));
-        ptr += sizeof(node_name_len);
-        memcpy(ptr, &n->handler, sizeof(n->handler));
-        ptr += sizeof(n->handler);
-        memcpy(ptr, &n->priority, sizeof(n->priority));
-        ptr += sizeof(n->priority);
-        memcpy(ptr, &n->abs_priority, sizeof(n->abs_priority));
-        ptr += sizeof(n->abs_priority);
-        memcpy(ptr, &n->terminal, sizeof(n->terminal));
-        ptr += sizeof(n->terminal);
-        memcpy(ptr, n->name.data(), node_name_len);
+            memcpy(ptr, &node_len, sizeof(node_len));
+            ptr += sizeof(node_len);
+            memcpy(ptr, &node_name_len, sizeof(node_name_len));
+            ptr += sizeof(node_name_len);
+            memcpy(ptr, &n->handler, sizeof(n->handler));
+            ptr += sizeof(n->handler);
+            memcpy(ptr, &n->priority, sizeof(n->priority));
+            ptr += sizeof(n->priority);
+            memcpy(ptr, &n->abs_priority, sizeof(n->abs_priority));
+            ptr += sizeof(n->abs_priority);
+            memcpy(ptr, &n->terminal, sizeof(n->terminal));
+            ptr += sizeof(n->terminal);
+            memcpy(ptr, n->name.data(), node_name_len);
 
 #endif
 
-        compiled_tree = compiled_node + compiled_tree;
-        return node_len;
+            compiled_tree = compiled_node + compiled_tree;
+
+            total_node_len += node_len;
+
+            if (!node_stack.empty()) {
+                auto next_frame = node_stack.pop();
+
+                if (frame.parent == next_frame.parent) {
+                    /*
+                     * This node is a sibling of currently processed node, add
+                     * the lengths currently processed node including its
+                     * subtree and lengths of previously processed siblings
+                     * along with their respective subtrees to the length of the
+                     * subtree of its parent.
+                     */
+                    next_frame.parent_tree_len +=
+                        frame.parent_tree_len + node_len;
+                } else if (frame.parent == next_frame.nodeptr) {
+                    /*
+                     * This node is the parent of currently and previously
+                     * processed nodes, add the length currently processed node
+                     * including its subtree and lengths of previously processed
+                     * siblings along with their respective subtrees to the
+                     * length of its subtree.
+                     */
+                    next_frame.tree_len +=
+                        frame.parent_tree_len + node_len;
+                }
+
+                node_stack.push(next_frame);
+            }
+        }
+
+        return total_node_len;
     }
 
     static

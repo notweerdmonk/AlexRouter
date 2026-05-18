@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <climits>
 #include <type_traits>
+#include <memory>
 #include <unordered_map>
 #include <hermes.hpp>
 
@@ -305,7 +306,7 @@ private:
         frame* alloc(frame *&mem, std::size_t nbytes) {
             mem = reinterpret_cast<frame*>(realloc(data_, nbytes));
             if (!mem) {
-                throw std::runtime_error("Could not allocate memory");
+                throw std::bad_alloc();
             }
             return mem;
         }
@@ -359,7 +360,9 @@ private:
     };
 
     struct node {
-        using map_type = std::unordered_map<std::string, node*>;
+        using nodeptr_type = std::unique_ptr<node>;
+        using map_type =
+            std::unordered_map<std::string, nodeptr_type>;
         using size_type = std::size_t;
 
         map_type children;
@@ -393,7 +396,7 @@ private:
             : name(std::move(name_)), handler(-1), terminal(false) {
         }
 
-        node* add(const string_view &name_) {
+        nodeptr_type& add(const string_view &name_) {
             typename map_type::iterator next;
             const std::string namestr(name_.data(), name_.length());
 
@@ -406,8 +409,9 @@ private:
                 next = children.emplace(std::make_pair(std::move(namestr),
                             nullptr)).first;
 
-                next->second = new node(string_view(next->first.data(),
-                            next->first.size()));
+                next->second = std::make_unique<node>(
+                        string_view(next->first.data(), next->first.size())
+                    );
             }
 
             return next->second;
@@ -446,7 +450,7 @@ private:
     };
     using route_stack_type = stack<route_frame_type>;
 
-    node *tree = new node("");
+    node::nodeptr_type tree = std::make_unique<node>("");
 
     std::vector<handlertype> handlers;
 
@@ -518,18 +522,6 @@ private:
         return read_node_data<bool>(node, terminal_offset);
     }
 
-    void free_children(node *parent) {
-        if (!parent) {
-            return;
-        }
-
-        for (auto &child : parent->children) {
-            free_children(child.second);
-        }
-
-        delete parent;
-    }
-
     /* Assume string_view length > 0 because next_segment split the route */
     unsigned short segment_weight(const string_view &segment) {
         switch (segment.data()[0]) {
@@ -545,7 +537,7 @@ private:
     }
 
     void add_nodes(std::vector<string_view> route, short handler) {
-        node *parent = tree;
+        std::reference_wrapper<typename node::nodeptr_type> parent = tree;
 
         using size_type = std::vector<string_view>::size_type;
 
@@ -569,13 +561,13 @@ private:
                 abs_priority = USHRT_MAX;
             }
 
-            parent = parent->add(segment);
+            parent = parent.get()->add(segment);
         }
 
-        parent->handler = handler;
-        parent->priority = priority;
-        parent->abs_priority = abs_priority;
-        parent->terminal = true;
+        parent.get()->handler = handler;
+        parent.get()->priority = priority;
+        parent.get()->abs_priority = abs_priority;
+        parent.get()->terminal = true;
     }
 
     /*
@@ -641,7 +633,7 @@ private:
      * 44. End Procedure
      *
      */
-    typename node::size_type compile_tree(node *n) {
+    typename node::size_type compile_tree(node::nodeptr_type& n) {
         using node_frame_type = struct {
             node *nodeptr;
             node *parent;
@@ -655,7 +647,7 @@ private:
 
         typename node::size_type total_node_len = 0;
 
-        node_stack.push({n, nullptr, 0, 0, false});
+        node_stack.push({n.get(), nullptr, 0, 0, false});
 
         while (!node_stack.empty()) {
             auto &frame = node_stack.top();
@@ -666,7 +658,7 @@ private:
 
                 auto n = frame.nodeptr;
                 for (auto &c : n->children) {
-                    node_stack.push({c.second, n, 0, 0, false});
+                    node_stack.push({c.second.get(), n, 0, 0, false});
                 }
 
                 continue;
@@ -1025,9 +1017,7 @@ public:
         args.get().reserve(100);
     }
 
-    ~http_router() {
-        free_children(tree);
-    }
+    ~http_router() = default;
         
     void add(
             const char *method,

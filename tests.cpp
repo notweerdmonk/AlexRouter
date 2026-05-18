@@ -181,7 +181,7 @@ void demo_routes() {
             }
         );
 
-    r.add("GET", "/service/*/logs/:querystr",
+    r.add("GET", "/service/*/logs",
             [](user_data *user, argstype &args, qargstype &qargs) {
                 std::cout << "Serving logs for " << args[0]
                 << std::endl;
@@ -239,6 +239,7 @@ void demo_routes() {
         "/service/cheese/dash/mozarella",
         "/service/cheese/query/name/",
         "/service/mail/logs",
+        "/service/mail/logs/?time=1732666926",
         "/service/upkeep/logs/?time=1732666926",
         "/foo/bar/111/baz",
         "/foo/bar/222",

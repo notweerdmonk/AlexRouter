@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <climits>
 #include <type_traits>
+#include <algorithm>
 #include <memory>
 #include <unordered_map>
 #include <hermes.hpp>

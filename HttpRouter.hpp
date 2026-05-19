@@ -978,7 +978,7 @@ private:
             ) {
 
                 if (store_match(found, compiled_node)) {
-                    std::swap<argstype>(args, route_args);
+                    std::swap(args, route_args);
                 }
                 continue;
             }
@@ -1102,7 +1102,7 @@ public:
 
 #endif
 
-        auto handler_id = lookup(target, sizeof(target));
+        auto handler_id = lookup(target, sizeof(target) - 1);
 
         if (
                 handler_id > -1 &&

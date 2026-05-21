@@ -42,6 +42,67 @@
 
 #endif /* __cplusplus < 201703L */
 
+#if __cplusplus < 201402L
+
+namespace std {
+    namespace detail {
+
+        template<typename>
+        struct is_unbounded_array {
+            static constexpr bool value = false;
+        };
+
+        template<typename T>
+        struct is_unbounded_array<T[]> {
+            static constexpr bool value = true;
+        };
+
+        template<typename>
+        struct is_bounded_array {
+            static constexpr bool value = false;
+        };
+
+        template<typename T, std::size_t N>
+        struct is_bounded_array<T[N]> {
+            static constexpr bool value = true;
+        };
+
+    }; /* namespace detail */
+
+    template<
+        typename T,
+        class... Args
+    >
+    typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
+    make_unique(Args&&... args) {
+        return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+    }
+
+    template<
+        typename T
+    >
+    typename std::enable_if<
+        detail::is_unbounded_array<T>::value,
+        std::unique_ptr<T>
+    >::type
+    make_unique(std::size_t n) {
+        return std::unique_ptr<T>(new T(std::remove_extent<T>::type[n]()));
+    }
+
+    template<
+        typename T,
+        class... Args
+    >
+    typename std::enable_if<
+        detail::is_bounded_array<T>::value,
+        std::unique_ptr<T>
+    >::type
+    make_unique(Args&&... args) = delete;
+
+}; /* namespace std */
+
+#endif /* __cplusplus < 201402L */
+
 #if __cplusplus < 201703L
 
 struct string_view {
@@ -368,33 +429,119 @@ private:
 
         map_type children;
         const string_view name;
-        short handler;
+        std::unique_ptr<handlertype> handler;
         unsigned short priority;
         unsigned short abs_priority;
         bool terminal;
 
         node(const char *nameptr)
-            : name(nameptr, strlen(nameptr)), handler(-1), terminal(false) {
+            : node(nameptr, nullptr) {
         }
 
         node(const char *nameptr, string_view::size_type namelength)
-            : name(nameptr, namelength), handler(-1), terminal(false) {
+            : node(nameptr, namelength, nullptr) {
         }
 
-        node(const std::string &name_)
-            : name(name_.data(), name_.size()), handler(-1), terminal(false) {
+        node(const std::string &name)
+            : node(name, nullptr) {
         }
 
-        node(std::string &&name_)
-            : name(name_.data(), name_.size()), handler(-1), terminal(false) {
+        node(std::string &&name)
+            : node(name, nullptr) {
         }
 
-        node(const string_view &name_)
-            : name(name_), handler(-1), terminal(false) {
+        node(const string_view &name)
+            : node(name, nullptr) {
         }
 
-        node(string_view &&name_)
-            : name(std::move(name_)), handler(-1), terminal(false) {
+        node(string_view &&name)
+            : node(name, nullptr) {
+        }
+
+        node(
+                const char *nameptr,
+                string_view::size_type namelength,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(nameptr, namelength), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                const char *nameptr,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(nameptr, strlen(nameptr)), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                const std::string &name,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(name.data(), name.size()), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                std::string &&name,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(name.data(), name.size()), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                const string_view &name,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(name), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                string_view &&name,
+                std::unique_ptr<handlertype>&& handler
+        ) : name(std::move(name)), handler(std::move(handler)),
+            terminal(false) {
+        }
+
+        node(
+                const char *nameptr,
+                string_view::size_type namelength,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(nameptr, namelength), handler(handler),
+            terminal(false) {
+        }
+
+        node(
+                const char *nameptr,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(nameptr, strlen(nameptr)), handler(handler),
+            terminal(false) {
+        }
+
+        node(
+                const std::string &name,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(name.data(), name.size()), handler(handler),
+            terminal(false) {
+        }
+
+        node(
+                std::string &&name,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(name.data(), name.size()), handler(handler),
+            terminal(false) {
+        }
+
+        node(
+                const string_view &name,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(name), handler(handler),
+            terminal(false) {
+        }
+
+        node(
+                string_view &&name,
+                const std::unique_ptr<handlertype>&& handler
+        ) : name(std::move(name)), handler(handler),
+            terminal(false) {
         }
 
         nodeptr_type& add(const string_view &name_) {
@@ -407,8 +554,9 @@ private:
                  * Insertion will succeed because we found no entries earlier,
                  * can skip checking second element of std::pair.
                  */
-                next = children.emplace(std::make_pair(std::move(namestr),
-                            nullptr)).first;
+                next = children.emplace(
+                        std::make_pair(std::move(namestr), nullptr)
+                ).first;
 
                 next->second = std::make_unique<node>(
                         string_view(next->first.data(), next->first.size())
@@ -428,7 +576,7 @@ private:
     enum compiled_node_member_sizes {
         node_length_size        = sizeof(typename node::size_type),
         node_name_length_size   = sizeof(typename node::size_type),
-        handler_size            = sizeof(node::handler),
+        handler_size            = sizeof(typename decltype(node::handler)::pointer),
         priority_size           = sizeof(node::priority),
         abs_priority_size       = sizeof(node::abs_priority),
         terminal_size           = sizeof(node::terminal)
@@ -451,9 +599,7 @@ private:
     };
     using route_stack_type = stack<route_frame_type>;
 
-    node::nodeptr_type tree = std::make_unique<node>("");
-
-    std::vector<handlertype> handlers;
+    typename node::nodeptr_type tree = std::make_unique<node>("");
 
     argstype args1, args2;
     qargstype qargs;
@@ -498,8 +644,8 @@ private:
     __inline
     static
     constexpr
-    short node_handler(const void *node) {
-        return read_node_data<short>(node, handler_offset);
+    handlertype* node_handler(const void *node) {
+        return read_node_data<handlertype*>(node, handler_offset);
     }
 
     __inline
@@ -537,7 +683,10 @@ private:
         }
     }
 
-    void add_nodes(std::vector<string_view> route, short handler) {
+    void add_nodes(
+            std::vector<string_view> route,
+            std::unique_ptr<handlertype>&& handler
+    ) {
         std::reference_wrapper<typename node::nodeptr_type> parent = tree;
 
         using size_type = std::vector<string_view>::size_type;
@@ -565,7 +714,7 @@ private:
             parent = parent.get()->add(segment);
         }
 
-        parent.get()->handler = handler;
+        parent.get()->handler = std::move(handler);
         parent.get()->priority = priority;
         parent.get()->abs_priority = abs_priority;
         parent.get()->terminal = true;
@@ -634,7 +783,7 @@ private:
      * 44. End Procedure
      *
      */
-    typename node::size_type compile_tree(node::nodeptr_type& n) {
+    typename node::size_type compile_tree(typename node::nodeptr_type& n) {
         using node_frame_type = struct {
             node *nodeptr;
             node *parent;
@@ -678,7 +827,7 @@ private:
             std::string compiled_node(
                 sizeof(typename node::size_type) +
                 sizeof(typename node::size_type) +
-                sizeof(n->handler) +
+                sizeof(typename decltype(n->handler)::pointer) +
                 sizeof(n->priority) +
                 sizeof(n->abs_priority) +
                 sizeof(n->terminal) +
@@ -687,27 +836,32 @@ private:
             );
 
             char* ptr = &compiled_node[0];
+            handlertype *handler_ptr = n->handler.get();
 
 #ifdef __GNUC__
 
             ptr = reinterpret_cast<decltype(ptr)>(
                     mempcpy(ptr, &node_len, sizeof(node_len))
+                );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                    mempcpy(ptr, &node_name_len, sizeof(node_name_len))
+                );
+            ptr = reinterpret_cast<decltype(ptr)>(
+                mempcpy(
+                    ptr,
+                    &handler_ptr,
+                    sizeof(typename decltype(n->handler)::pointer)
+                )
             );
             ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &node_name_len, sizeof(node_name_len))
-            );
+                    mempcpy(ptr, &n->priority, sizeof(n->priority))
+                );
             ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &n->handler, sizeof(n->handler))
-            );
+                    mempcpy(ptr, &n->abs_priority, sizeof(n->abs_priority))
+                );
             ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &n->priority, sizeof(n->priority))
-            );
-            ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &n->abs_priority, sizeof(n->abs_priority))
-            );
-            ptr = reinterpret_cast<decltype(ptr)>(
-                mempcpy(ptr, &n->terminal, sizeof(n->terminal))
-            );
+                    mempcpy(ptr, &n->terminal, sizeof(n->terminal))
+                );
             memcpy(ptr, n->name.data(), node_name_len);
 
 #else
@@ -716,7 +870,11 @@ private:
             ptr += sizeof(node_len);
             memcpy(ptr, &node_name_len, sizeof(node_name_len));
             ptr += sizeof(node_name_len);
-            memcpy(ptr, &n->handler, sizeof(n->handler));
+            memcpy(
+                ptr,
+                &handler_ptr,
+                sizeof(typename decltype(n->handler)::pointer)
+            );
             ptr += sizeof(n->handler);
             memcpy(ptr, &n->priority, sizeof(n->priority));
             ptr += sizeof(n->priority);
@@ -919,7 +1077,7 @@ private:
     }
 
     // should take method also!
-    inline typename std::make_signed<typename node::size_type>::type lookup(
+    inline handlertype* lookup(
             const char *url,
             typename node::size_type length
     ) {
@@ -1001,14 +1159,14 @@ private:
                             find_node(compiled_node, start, stop - start)
                         )
                 ) {
-                    return -1;
+                    return nullptr;
                 }
 
                 start = stop + 1;
             } while (stop != end_ptr);
         }
 
-        return found ? node_handler(found) : -1;
+        return found ? node_handler(found) : nullptr;
     }
 
 public:
@@ -1023,8 +1181,13 @@ public:
     void add(
             const char *method,
             const char *pattern,
-            handlertype handler
+            const handlertype& handler
     ) {
+
+        auto handler_ptr = std::make_unique<handlertype>(std::move(handler));
+        if (!handler_ptr) {
+            throw std::bad_alloc();
+        }
 
         // if pattern starts with / then move 1+ and run inline slash parser
 
@@ -1056,8 +1219,7 @@ public:
             start = stop + 1;
         } while (stop != end_ptr && start != end_ptr);
 
-        add_nodes(nodes, handlers.size());
-        handlers.push_back(handler);
+        add_nodes(nodes, std::move(handler_ptr));
 
         compile();
     }
@@ -1065,7 +1227,7 @@ public:
     void add(
             const std::string &method,
             const std::string &pattern,
-            handlertype handler
+            const handlertype& handler
     ) {
 
         add(method.c_str(), pattern.c_str(), handler);
@@ -1084,8 +1246,6 @@ public:
             userdata userData
     ) {
 
-        using size_type = typename decltype(handlers)::size_type;
-
         /* Prepend method to URL */
         char target[method_length + url_length + 1];
 #ifdef __GNUC__
@@ -1102,13 +1262,10 @@ public:
 
 #endif
 
-        auto handler_id = lookup(target, sizeof(target) - 1);
+        auto handler = lookup(target, sizeof(target) - 1);
 
-        if (
-                handler_id > -1 &&
-                static_cast<size_type>(handler_id) < handlers.size()
-        ) {
-            handlers[handler_id](userData, args, qargs);
+        if (handler) {
+            (*handler)(userData, args, qargs);
             args.get().clear();
             qargs.clear();
         }

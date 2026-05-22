@@ -1,8 +1,15 @@
 SHELL := /bin/bash
 CC := g++
 
+SUPPORTED_CXX_VERSIONS := c++11 c++14 c++17 c++20 c++23
+
+
 ifeq ($(CXX_VERSION),)
 CXX_VERSION := c++23
+else
+ifeq ($(findstring $(CXX_VERSION), $(SUPPORTED_CXX_VERSIONS)),)
+CXX_VERSION := c++23
+endif
 endif
 
 ifneq ($(DEBUG),)
@@ -58,7 +65,23 @@ $(TARGETS): $(OBJECTS)
 ./%.o: ./%.cpp $(HEADER_FILES) $(DEP_HEADER_FILES)
 	$(CC) -std=$(CXX_VERSION) $(CFLAGS) $(INCLUDE_FLAGS) -o $@ -c $<
 
+test: $(TARGETS)
+	./tests --test
+
+check-all-versions:
+	for version in $(SUPPORTED_CXX_VERSIONS); do \
+		make clean; \
+		CXX_VERSION=$${version} make; \
+	done
+
+test-all-versions:
+	for version in $(SUPPORTED_CXX_VERSIONS); do \
+		make clean; \
+		CXX_VERSION=$${version} make; \
+		make test; \
+	done
+
 clean:
 	rm -f $(OBJECTS) $(TARGETS) 
 
-.PHONY: all clean
+.PHONY: all clean test

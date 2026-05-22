@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include <chrono>
 
 #include <HttpRouter.hpp>
@@ -259,16 +260,437 @@ void demo_routes() {
     }
 }
 
+int test_routes() {
+    struct user_data {
+        int test_count = 0;
+        int pass_count = 0;
+
+        std::function<
+            int (
+                std::vector<string_view> &args,
+                std::unordered_map<std::string, std::string> &qargs
+            )
+        > checker;
+
+        int do_check(
+                std::vector<string_view> &args,
+                std::unordered_map<std::string, std::string> &qargs
+        ) {
+            ++test_count;
+            if (!checker(args, qargs)) {
+                ++pass_count;
+                return 0;
+            }
+            return -1;
+        }
+    } userdata;
+
+    http_router<user_data*> router;
+
+    using argstype = http_router<user_data*>::argstype;
+    using qargstype = http_router<user_data*>::qargstype;
+
+    // set up a few routes
+    router.add(std::string("GET"), "/service/candy/:kind",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                            args[0] == "lollipop" ||
+                            args[0] == "gum" ||
+                            args[0] == "seg_råtta" ||
+                            args[0] == "lakrits"
+                    )) {
+                        return -1;
+                    }
+                    if (
+                            !(
+                                qargs.size() == 1 &&
+                                qargs["ABCD"] == "ABCD"
+                            ) &&
+                            !(
+                                qargs.size() == 2 &&
+                                qargs["foo"] == "bar" &&
+                                qargs["page"] == "123"
+                            ) &&
+                            !(
+                                qargs.size() == 0
+                            )
+                    ) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add(std::string("GET"), "/service/shutdown",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (
+                            !(
+                                args.size() == 0
+                            ) &&
+                            !(
+                                qargs.size() == 1 &&
+                                qargs["a"] == "b"
+                            ) &&
+                            !(
+                                qargs.size() == 0
+                            )
+                    ) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                            args.size() == 0 &&
+                            qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/:filename",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                            args.size() == 1 &&
+                            (
+                                args[0] == "some_file.html" ||
+                                args[0] == "another_file.jpeg"
+                            )
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/:page/:username",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                            args.size() == 2 &&
+                            args[0] == "1" &&
+                            args[1] == "admin" &&
+                            qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/service/:kind/dash/:type",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (
+                            !(
+                                args.size() == 2 &&
+                                args[0] == "cheese" &&
+                                args[1] == "mozarella"
+                            ) &&
+                            !(
+                                qargs.size() == 0 ||
+                                (
+                                    qargs.size() == 1 &&
+                                    qargs["input string"] == "1 20"
+                                )
+                            )
+                    ) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/service/:name",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                        args.size() == 1 &&
+                        args[0] == "unknown" &&
+                        qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/service/:name/query/:querystr",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                        args.size() == 2 &&
+                        args[0] == "cheese" &&
+                        args[1] == "name" &&
+                        qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/service/*/logs",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (
+                            !(
+                                args.size() == 1 &&
+                                (
+                                    args[0] == "mail" ||
+                                    args[0] == "upkeep"
+                                )
+                            ) &&
+                            !(
+                                qargs.size() == 0 ||
+                                (
+                                    qargs.size() == 1 &&
+                                    qargs["time"] == "1732666926"
+                                )
+                            )
+                    ) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/foo/bar/:arg/baz",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                        args.size() == 1 &&
+                        args[0] == "111" &&
+                        qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    router.add("GET", "/foo/bar/:arg",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                        args.size() == 1 &&
+                        args[0] == "222" &&
+                        qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    /* Should be of lower priority */
+    router.add("GET", "/:name/known",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                            args.size() == 1 &&
+                            args[0].size() > 0 &&
+                            qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    /* Should be of higher priority becuase there is match before variable */
+    router.add("GET", "/someplace/:name",
+            [](user_data *user, argstype &args, qargstype &qargs) {
+                assert((user && "data pointer is nullptr"));
+                user->checker = [](argstype &args, qargstype &qargs) {
+                    if (!(
+                        args.size() == 1 &&
+                        args[0] == "known" &&
+                        qargs.size() == 0
+                    )) {
+                        return -1;
+                    }
+                    return 0;
+                };
+                if (!user->do_check(args, qargs)) {
+                    std::cout << "PASS\n";
+                } else {
+                    std::cout << "FAIL\n";
+                }
+            }
+        );
+
+    // run benchmark of various urls
+    std::vector<std::string> test_urls = {
+        "/service/candy/lollipop",
+        "/service/candy/gum",
+        "/service/candy/seg_råtta",
+        "/service/candy/lakrits",
+
+        "/service/shutdown",
+        "/",
+        "/some_file.html",
+        "/another_file.jpeg",
+
+        "/1/admin/",
+        "/service/cheese/dash/mozarella",
+        "/service/cheese/query/name/",
+        "/service/mail/logs",
+        "/service/mail/logs/?time=1732666926",
+        "/service/upkeep/logs/?time=1732666926",
+        "/foo/bar/111/baz",
+        "/foo/bar/222",
+        "/service/unknown",
+        "/someplace/somewhere/unknown",
+        "/someplace/known",
+        "/service/candy/lollipop/?foo=bar&page=123",
+        "/service/cheese/dash/mozarella/?=&input%20string=1%2020",
+        "/service/shutdown?a=b",
+        "/service/candy/gum?%41%42%43%44",
+    };
+
+    for (std::string &test_url : test_urls) {
+        std::cout << "URL: [" << test_url << "]" << std::endl;
+        router.route("GET", 3, test_url.data(), test_url.length(), &userdata);
+        std::cout << std::endl;
+    }
+
+    std::cout << "=== Summary ===\n\n"
+        << "Total tests:\t" << userdata.test_count << "\n"
+        << "Tests passed:\t" << userdata.pass_count << "\n\n";
+
+    return userdata.test_count == userdata.pass_count ? 0 : -1;
+}
+
 int main(int argc, char *argv[]) {
-    calculate_cpu_clock_speed();
-    if (argc == 1) {
+    int ret = 0;
+    if (
+            argc == 1 ||
+            (
+                argc > 1 &&
+                (
+                    !strncmp(argv[argc - 1], "--demo", sizeof("--demo") - 1) ||
+                    !strncmp(argv[argc - 1], "-d", sizeof("-d") - 1)
+                )
+            )
+    ) {
+        calculate_cpu_clock_speed();
         std::cout << "\nDemo commences\n\n";
         demo_routes();
         std::cout << "Demo concludes\n\n";
     } else if (argc > 1) {
-        std::cout << "\nBenchmark\n\n";
-        benchmark_routes();
+        if (
+                !strncmp(argv[argc - 1], "--test", sizeof("--test") - 1) ||
+                !strncmp(argv[argc - 1], "-t", sizeof("-t") - 1)
+        ) {
+            std::cout << "\nTest commences\n\n";
+            ret = test_routes();
+            std::cout << "Test concludes\n\n";
+        } else if (
+                !strncmp(argv[argc - 1], "--benchmark", sizeof("--benchmark") - 1) ||
+                !strncmp(argv[argc - 1], "-b", sizeof("-b") - 1)
+        ) {
+            std::cout << "\nBenchmark commences\n\n";
+            benchmark_routes();
+            std::cout << "\nBenchmark concludes\n\n";
+        } else {
+            std::cout << "Invalid arguments\n";
+            return -1;
+        }
     }
 
-    return 0;
+    return ret;
 }

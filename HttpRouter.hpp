@@ -949,20 +949,20 @@ private:
         } else if (candidate[name_offset] == ':') {
             // parameter
 
-            if (args_idx < args.size()) {
+            if (args_idx == args.size()) {
+                // todo: push this pointer on the stack of args!
+                args.push_back(string_view({name, name_length}));
+
+                /* maintain index of args to backtrack */
+                args_idx = args.size();
+            } else {
+                args.resize(args_idx + 1);
                 /*
                  * Update args array at args_idx instead of appending
                  * We will always backtrack to the args_idx corresponding to
                  * current URL segment
                  */
                 args[args_idx++] = string_view({name, name_length});
-
-            } else {
-                // todo: push this pointer on the stack of args!
-                args.push_back(string_view({name, name_length}));
-
-                /* maintain index of args to backtrack */
-                args_idx = args.size();
             }
 
             return true;
@@ -1090,7 +1090,7 @@ private:
         const char *end_ptr = next_segment(start, stop, '?');
 
         if (end_ptr != stop) {
-            query_args(end_ptr + 1, length - (end_ptr - start), qargs);
+            query_args(end_ptr + 1, length - (end_ptr - start) - 1, qargs);
         }
 
         route_stack.clear();
@@ -1268,6 +1268,7 @@ public:
             (*handler)(userData, args, qargs);
         }
 
+        route_args.get().clear();
         args.get().clear();
         qargs.clear();
     }

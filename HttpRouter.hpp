@@ -1266,9 +1266,10 @@ public:
 
         if (handler) {
             (*handler)(userData, args, qargs);
-            args.get().clear();
-            qargs.clear();
         }
+
+        args.get().clear();
+        qargs.clear();
     }
 };
 

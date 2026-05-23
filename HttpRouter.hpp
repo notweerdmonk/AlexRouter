@@ -504,42 +504,42 @@ private:
         node(
                 const char *nameptr,
                 string_view::size_type namelength,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(nameptr, namelength), handler(handler),
             terminal(false) {
         }
 
         node(
                 const char *nameptr,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(nameptr, strlen(nameptr)), handler(handler),
             terminal(false) {
         }
 
         node(
                 const std::string &name,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(name.data(), name.size()), handler(handler),
             terminal(false) {
         }
 
         node(
                 std::string &&name,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(name.data(), name.size()), handler(handler),
             terminal(false) {
         }
 
         node(
                 const string_view &name,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(name), handler(handler),
             terminal(false) {
         }
 
         node(
                 string_view &&name,
-                const std::unique_ptr<handlertype>&& handler
+                const std::unique_ptr<handlertype>& handler
         ) : name(std::move(name)), handler(handler),
             terminal(false) {
         }

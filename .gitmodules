@@ -1,0 +1,3 @@
+[submodule "testftw"]
+	path = testftw
+	url = https://github.com/notweerdmonk/testftw

@@ -3,7 +3,6 @@ CC := g++
 
 SUPPORTED_CXX_VERSIONS := c++11 c++14 c++17 c++20 c++23
 
-
 ifeq ($(CXX_VERSION),)
 CXX_VERSION := c++23
 else

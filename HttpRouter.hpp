@@ -929,7 +929,7 @@ private:
             qargstype &qargs
     ) {
         string_view target(in, len);
-        hermes::query_decode<>(target, qargs);
+        hermes::url::streamdecode<>(target, qargs, true);
     }
 
     inline bool match_node(

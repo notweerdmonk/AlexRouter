@@ -592,9 +592,12 @@ private:
         name_offset             = terminal_offset + terminal_size
     };
 
+    using compiled_tree_datatype = unsigned char;
+    using compiled_tree_type = std::vector<compiled_tree_datatype>;
+
     using route_frame_type = struct {
         const char *segptr;
-        const char *nodeptr;
+        const compiled_tree_datatype *nodeptr;
         std::size_t args_idx;
     };
     using route_stack_type = stack<route_frame_type>;
@@ -606,7 +609,8 @@ private:
     std::reference_wrapper<argstype> route_args = args1;
     std::reference_wrapper<argstype> args = args2;
 
-    std::string compiled_tree;
+    compiled_tree_type compiled_tree;
+
     route_stack_type route_stack;
 
     template<typename T>
@@ -620,7 +624,8 @@ private:
 #if __cplusplus >= 201703L
         const std::byte *byteptr = static_cast<const std::byte*>(node);
 #else
-        const unsigned char *byteptr = static_cast<const unsigned char*>(node);
+        const compiled_tree_datatype *byteptr =
+            static_cast<const compiled_tree_datatype*>(node);
 #endif
         T tmpobj;
         std::memcpy(&tmpobj, byteptr + bytes_offset, sizeof(T));
@@ -824,7 +829,7 @@ private:
                 node_len += frame.tree_len;
             }
 
-            std::string compiled_node(
+            compiled_tree_type compiled_node(
                 sizeof(typename node::size_type) +
                 sizeof(typename node::size_type) +
                 sizeof(typename decltype(n->handler)::pointer) +
@@ -835,7 +840,7 @@ private:
                 '\0'
             );
 
-            char* ptr = &compiled_node[0];
+            compiled_tree_datatype *ptr = &compiled_node[0];
             handlertype *handler_ptr = n->handler.get();
 
 #ifdef __GNUC__
@@ -886,7 +891,12 @@ private:
 
 #endif
 
-            compiled_tree = compiled_node + compiled_tree;
+            compiled_node.insert(
+                    compiled_node.cend(),
+                    compiled_tree.begin(),
+                    compiled_tree.end()
+            );
+            compiled_tree = std::move(compiled_node);
 
             total_node_len += node_len;
 
@@ -933,7 +943,7 @@ private:
     }
 
     inline bool match_node(
-            const char *candidate,
+            const compiled_tree_datatype *candidate,
             const char *name,
             typename node::size_type name_length,
             argstype &args,
@@ -1032,21 +1042,23 @@ private:
 
     inline void push_children(
             const char *segment,
-            const char *node,
+            const compiled_tree_datatype *node,
             typename node::size_type args_idx
     ) {
 
-        for (const char *child = node + name_offset + node_name_length(node);
+        for (
+                const compiled_tree_datatype *child =
+                    node + name_offset + node_name_length(node);
                 child < node + node_length(node);
-                child = child + node_length(child)) {
-
+                child = child + node_length(child)
+        ) {
             route_stack.push({segment, child, args_idx});
         } 
     }
 
     inline bool store_match(
-            const char *&store,
-            const char *match
+            const compiled_tree_datatype *&store,
+            const compiled_tree_datatype *match
     ) {
         if (!match) {
             return false;
@@ -1082,9 +1094,11 @@ private:
             typename node::size_type length
     ) {
 
-        const char *found = nullptr;
+        const compiled_tree_datatype *found = nullptr;
 
-        const char *compiled_node = (char*)compiled_tree.data();
+        const compiled_tree_datatype *compiled_node =
+            (compiled_tree_datatype*)compiled_tree.data();
+
         const char *start = url;
         const char *stop = start + length; // This assignment is for reuse only
         const char *end_ptr = next_segment(start, stop, '?');

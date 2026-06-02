@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include <HttpRouter.hpp>
+#include <testftw.hpp>
 
 static
 inline
@@ -35,7 +36,7 @@ void calculate_cpu_clock_speed() {
     std::cout << "CPU freq: " << fcpu_ghz << " GHz\n";
 }
 
-void benchmark_routes() {
+void benchmark_routes(const unsigned int &num_runs) {
     struct user_data {
         int routed = 0;
     } userData;
@@ -84,16 +85,14 @@ void benchmark_routes() {
     };
 
     for (std::string &test_url : test_urls) {
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < 10000000; i++) {
-            r.route("GET", 3, test_url.data(), test_url.length(), &userData);
-        }
-        auto stop = std::chrono::high_resolution_clock::now();
-        unsigned int ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                    stop - start
-            ).count();
-        std::cout << "[" << 10000.0 / ms << " million req/sec] for URL: "
+        std::chrono::milliseconds elapsed_ms;
+        BENCHMARK_START(num_runs)
+            for (int i = 0; i < 10000000; i++) {
+                r.route("GET", 3, test_url.data(), test_url.length(), &userData);
+            }
+        BENCHMARK_END(elapsed_ms);
+        std::cout << "[" << (num_runs * 10000.0) / elapsed_ms.count() <<
+            " million req/sec] for URL: "
             << test_url << std::endl;
     }
 
@@ -662,8 +661,8 @@ int main(int argc, char *argv[]) {
             (
                 argc > 1 &&
                 (
-                    !strncmp(argv[argc - 1], "--demo", sizeof("--demo") - 1) ||
-                    !strncmp(argv[argc - 1], "-d", sizeof("-d") - 1)
+                    !strncmp(argv[1], "--demo", sizeof("--demo") - 1) ||
+                    !strncmp(argv[1], "-d", sizeof("-d") - 1)
                 )
             )
     ) {
@@ -673,18 +672,23 @@ int main(int argc, char *argv[]) {
         std::cout << "Demo concludes\n\n";
     } else if (argc > 1) {
         if (
-                !strncmp(argv[argc - 1], "--test", sizeof("--test") - 1) ||
-                !strncmp(argv[argc - 1], "-t", sizeof("-t") - 1)
+                !strncmp(argv[1], "--test", sizeof("--test") - 1) ||
+                !strncmp(argv[1], "-t", sizeof("-t") - 1)
         ) {
             std::cout << "\nTest commences\n\n";
             ret = test_routes();
             std::cout << "Test concludes\n\n";
         } else if (
-                !strncmp(argv[argc - 1], "--benchmark", sizeof("--benchmark") - 1) ||
-                !strncmp(argv[argc - 1], "-b", sizeof("-b") - 1)
+                !strncmp(argv[1], "--benchmark", sizeof("--benchmark") - 1) ||
+                !strncmp(argv[1], "-b", sizeof("-b") - 1)
         ) {
-            std::cout << "\nBenchmark commences\n\n";
-            benchmark_routes();
+            unsigned int num_runs = 5;
+            if (argc > 2) {
+                num_runs = std::atoi(argv[2]);
+            }
+            std::cout << "\nBenchmark commences\n"
+                << "\nNumber of runs: " << num_runs << "\n\n";
+            benchmark_routes(num_runs);
             std::cout << "\nBenchmark concludes\n\n";
         } else {
             std::cout << "Invalid arguments\n";

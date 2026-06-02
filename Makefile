@@ -27,21 +27,21 @@ endif
 
 CFLAGS += $(OPTIM) -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wstrict-aliasing=2
 
-ifeq ($(INCLUDE_DIR),)
-INCLUDE_DIR := .
+ifeq ($(INCLUDE_DIRS),)
+INCLUDE_DIRS := . testftw
 endif
 
 HEADER_FILES := HttpRouter.hpp
-HEADER_FILES := $(foreach header, $(HEADER_FILES), $(INCLUDE_DIR)/$(header))
+HEADER_FILES += $(foreach header, $(wildcard $(INCLUDE_DIRS)/*.h), $(header))
+HEADER_FILES += $(foreach header, $(wildcard $(INCLUDE_DIRS)/*.hpp), $(header))
 
 DEP_MODULES := hermes
 DEP_HEADER_FILES += $(foreach header, $(wildcard $(DEP_MODULES)/*.h), $(header))
 DEP_HEADER_FILES += $(foreach header, $(wildcard $(DEP_MODULES)/*.hpp), $(header))
-DEP_HEADER_FILES := $(foreach header, $(DEP_HEADER_FILES), $(header))
 
-INCLUDE_DIR += $(DEP_MODULES)
+INCLUDE_DIRS += $(DEP_MODULES)
 
-INCLUDE_FLAGS := $(foreach include_dir, $(INCLUDE_DIR), -I$(include_dir))
+INCLUDE_FLAGS := $(foreach include_dir, $(INCLUDE_DIRS), -I$(include_dir))
 
 LIBS :=
 LD_FLAGS := $(foreach lib, $(LIBS), -l$(lib))
